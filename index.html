@@ -1619,6 +1619,7 @@
     const WORLD_FIELD = { w: WORLD_BASE.w * 3, h: WORLD_BASE.h * 3 };
     const WORLD_RAMP_CITY = { w: 1900, h: 980 };
     const WORLD_SIEGE = { w: 1680, h: 6200 };
+    const BLUE_ROOM_MAX_LEVEL = 50;
     const COLORS = {
       player: ["#2f6f54", "#9aa3ad", "#ff9f1c", "#8d41c7"],
       teamBlue: "#2d6cdf",
@@ -2045,7 +2046,7 @@
 
     function normalizeBlueRoomAI(saved = {}) {
       return {
-        level: clamp(Math.floor(Number(saved.level) || 0), 0, 5),
+        level: clamp(Math.floor(Number(saved.level) || 0), 0, BLUE_ROOM_MAX_LEVEL),
         sessions: Math.max(0, Math.floor(Number(saved.sessions) || 0)),
         experience: Math.max(0, Math.floor(Number(saved.experience) || 0)),
         shotsFired: Math.max(0, Math.floor(Number(saved.shotsFired) || 0)),
@@ -2053,6 +2054,7 @@
         damageDealt: Math.max(0, Math.floor(Number(saved.damageDealt) || 0)),
         playerWins: Math.max(0, Math.floor(Number(saved.playerWins) || 0)),
         aiWins: Math.max(0, Math.floor(Number(saved.aiWins) || 0)),
+        speedSetting: clamp(Number(saved.speedSetting) || 1, 1, 5),
         lastLearningAt: Math.max(0, Number(saved.lastLearningAt) || 0)
       };
     }
@@ -2065,7 +2067,7 @@
       account.blueRoomAI = {
         ...progress,
         experience: progress.experience + passiveMinutes,
-        level: clamp(progress.level + Math.floor(passiveMinutes / 30), 0, 5),
+        level: clamp(progress.level + Math.floor(passiveMinutes / 30), 0, BLUE_ROOM_MAX_LEVEL),
         lastLearningAt: now
       };
       if (passiveMinutes || !progress.lastLearningAt) saveAccounts();
@@ -3047,7 +3049,13 @@
         phase: firstBlueRoomVisit ? "countdown" : "active",
         timer: firstBlueRoomVisit ? 10 : 0,
         accountId: blueRoomAccount.id,
-        sessionLevel: clamp((blueRoomProgress?.level || 0) + 1, 1, 5),
+        completedSessions: blueRoomProgress?.sessions || 0,
+        speedSettingUnlocked: (blueRoomProgress?.level || 0) + 1 >= 10,
+        speedSetting: (blueRoomProgress?.level || 0) + 1 >= 10
+          ? clamp(blueRoomProgress?.speedSetting || 1, 1, 5)
+          : 1,
+        speedDecisionTimer: 0,
+        sessionLevel: clamp((blueRoomProgress?.level || 0) + 1, 1, BLUE_ROOM_MAX_LEVEL),
         sessionRecorded: false,
         brain: { skill: clamp((blueRoomProgress?.level || 0) + 1, 1, 5), experience: blueRoomProgress?.experience || 0 },
         activeTime: 0,
@@ -4593,15 +4601,26 @@
         tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
         tank.rocketReload = Math.max(0, tank.rocketReload - dt);
         tank.launcherReload = Math.max(0, tank.launcherReload - dt);
+        tank.mineReload = Math.max(0, tank.mineReload - dt);
+        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
+        tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
         if (tank.controller === "ai") updateAiTank(tank, dt);
         if (tank.controller === "human") updateHumanTank(tank, dt);
+        updateHazardDamage(tank, dt);
+        updateRepairDrone(tank, dt);
         updateTankDamageEffects(tank, dt);
       }
+      updateAirstrikeAim(dt);
+      updateAirstrikes(dt);
       updateRocketPods(dt);
       updateLasers(dt);
       updateBullets(dt);
       updateParticles(dt);
       updateTrackMarks(dt);
+      updateMineButtons();
+      updateAirstrikeButtons();
+      updateRocketLauncherButtons();
+      updateLaserChargeButtons();
       game.shake = Math.max(0, game.shake - dt * 15);
       checkWinState();
     }
@@ -4622,7 +4641,7 @@
         r: 35,
         hp: 220,
         maxHp: 220,
-        speed: 170,
+        speed: 170 * (game.blueRoom?.speedSetting || 1),
         bulletSpeed: 390,
         bulletDamage: 15,
         reloadTime: 1.15,
@@ -4770,7 +4789,27 @@
       const turnSpeed = 1.6 + skill * .75;
       tank.turretAngle = lerpAngle(tank.turretAngle, desiredAngle, clamp(turnSpeed * dt, 0, 1));
 
-      if (skill >= 2) {
+      if (room.speedSettingUnlocked) {
+        room.speedDecisionTimer -= dt;
+        if (room.speedDecisionTimer <= 0) {
+          room.speedDecisionTimer = .9;
+          const healthPressure = 1 - tank.hp / Math.max(1, tank.maxHp);
+          const incomingFire = game.bullets.some((bullet) => {
+            if (sameTeam(bullet.team, tank.team) || bullet.owner === tank.id) return false;
+            return Math.hypot(bullet.x - tank.x, bullet.y - tank.y) < 220;
+          });
+          let desiredSpeed = distance > 470 ? 4.5 : distance > 335 ? 3.2 : distance < 175 ? 1.6 : 2.35;
+          if (healthPressure > .55) desiredSpeed = Math.max(desiredSpeed, 4.1);
+          if (incomingFire) desiredSpeed = 5;
+          room.speedSetting += clamp(desiredSpeed - room.speedSetting, -.9, .9);
+          room.speedSetting = clamp(room.speedSetting, 1, 5);
+        }
+        tank.speed = 170 * room.speedSetting;
+      } else {
+        tank.speed = 170;
+      }
+
+      {
         tank.aiThink -= dt;
         if (tank.aiThink <= 0) {
           tank.aiThink = Math.max(.24, .78 - skill * .09);
@@ -4780,7 +4819,7 @@
         const preferredRange = skill >= 5 ? 285 : 335;
         let moveX = dx / distance * clamp((distance - preferredRange) / 110, -1, 1);
         let moveY = dy / distance * clamp((distance - preferredRange) / 110, -1, 1);
-        const orbitStrength = skill >= 5 ? .72 : skill >= 3 ? .48 : .24;
+        const orbitStrength = skill >= 5 ? .72 : skill >= 3 ? .48 : skill >= 2 ? .24 : .12;
         moveX += -dy / distance * orbitStrength * tank.blueRoomOrbit;
         moveY += dx / distance * orbitStrength * tank.blueRoomOrbit;
 
@@ -4811,9 +4850,6 @@
         if (length > 1) { moveX /= length; moveY /= length; }
         moveTank(tank, moveX, moveY, dt);
         if (length > .12) tank.bodyAngle = lerpAngle(tank.bodyAngle, Math.atan2(moveY, moveX), clamp(dt * 3.5, 0, 1));
-      } else {
-        tank.vx = 0;
-        tank.vy = 0;
       }
 
       const aimError = Math.abs(Math.atan2(Math.sin(desiredAngle - tank.turretAngle), Math.cos(desiredAngle - tank.turretAngle)));
@@ -6719,6 +6755,9 @@
             damageDealt: progress.damageDealt + Math.floor(game.blueRoom.aiDamage || 0),
             playerWins: progress.playerWins + (outcome === "player" ? 1 : 0),
             aiWins: progress.aiWins + (outcome === "ai" ? 1 : 0),
+            speedSetting: (game.blueRoom?.sessionLevel || 0) >= 10
+              ? clamp(game.blueRoom.speedSetting, 1, 5)
+              : progress.speedSetting,
             lastLearningAt: Date.now()
           };
           saveAccounts();
@@ -7521,11 +7560,15 @@
       ctx.textBaseline = "middle";
       if (room.phase === "active" && room.noticeTimer > 0) {
         const messages = ["", "AI online · aim and fire", "AI learning to drive", "AI learning to dodge shots", "AI learning to lead moving targets", "AI advanced · maneuvering and flanking"];
+        const trainingLevel = clamp(room.sessionLevel || 1, 1, BLUE_ROOM_MAX_LEVEL);
+        const notice = trainingLevel <= 5
+          ? messages[trainingLevel]
+          : `AI training session ${trainingLevel} of ${BLUE_ROOM_MAX_LEVEL}`;
         ctx.fillStyle = "rgba(12,22,34,.76)";
         roundRect(innerWidth * .23, innerHeight * .19, innerWidth * .54, 54, 10); ctx.fill();
         ctx.fillStyle = "#9deaff";
         ctx.font = `800 ${Math.max(15, Math.min(22, innerWidth * .02))}px system-ui`;
-        ctx.fillText(messages[clamp(room.sessionLevel || 1, 1, 5)], innerWidth / 2, innerHeight * .19 + 27, innerWidth * .5);
+        ctx.fillText(notice, innerWidth / 2, innerHeight * .19 + 27, innerWidth * .5);
       }
       ctx.restore();
     }
