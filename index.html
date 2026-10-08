@@ -1335,10 +1335,17 @@
         </div>
         <div class="upgradeRow">
           <div>
-            <strong>Bullet Speed</strong>
-            <span id="speedUpgradeText">Level 0 - Shells fly faster.</span>
+            <strong>Tank Speed</strong>
+            <span id="speedUpgradeText">Level 0 - Tank moves faster.</span>
           </div>
           <button class="smallButton" data-upgrade="speed" id="speedUpgradeButton">Buy</button>
+        </div>
+        <div class="upgradeRow">
+          <div>
+            <strong>Bullet Type</strong>
+            <span id="bulletSpeedUpgradeText">Level 0 - Shells fly faster.</span>
+          </div>
+          <button class="smallButton" data-upgrade="bulletSpeed" id="bulletSpeedUpgradeButton">Buy</button>
         </div>
         <div class="upgradeRow">
           <div>
@@ -1580,6 +1587,8 @@
     const reloadUpgradeButton = document.getElementById("reloadUpgradeButton");
     const speedUpgradeText = document.getElementById("speedUpgradeText");
     const speedUpgradeButton = document.getElementById("speedUpgradeButton");
+    const bulletSpeedUpgradeText = document.getElementById("bulletSpeedUpgradeText");
+    const bulletSpeedUpgradeButton = document.getElementById("bulletSpeedUpgradeButton");
     const airstrikeUpgradeText = document.getElementById("airstrikeUpgradeText");
     const airstrikeUpgradeButton = document.getElementById("airstrikeUpgradeButton");
     const bombDropperUpgradeText = document.getElementById("bombDropperUpgradeText");
@@ -2007,7 +2016,17 @@
     }
 
     function defaultUpgrades() {
-      return { damage: 0, armor: 0, rocket: 0, reload: 0, speed: 0, airstrike: 0, bombDropper: 0, laser: 0, trackingRockets: 0, barricade: 0, mineDestroyer: 0, paint: 0, repairDrone: 0 };
+      return { damage: 0, armor: 0, rocket: 0, reload: 0, speed: 0, bulletSpeed: 0, airstrike: 0, bombDropper: 0, laser: 0, trackingRockets: 0, barricade: 0, mineDestroyer: 0, paint: 0, repairDrone: 0 };
+    }
+
+    function normalizeUpgrades(saved = {}) {
+      const upgrades = { ...defaultUpgrades(), ...(saved || {}) };
+      // Before Tank Speed existed, "speed" meant Bullet Speed. Keep old purchases on shells.
+      if (!Object.prototype.hasOwnProperty.call(saved || {}, "bulletSpeed")) {
+        upgrades.bulletSpeed = clamp(Math.floor(Number(saved?.speed) || 0), 0, 3);
+        upgrades.speed = 0;
+      }
+      return upgrades;
     }
 
     function defaultTankBay() {
@@ -2100,7 +2119,7 @@
     function normalizeAccount(account, index) {
       const defaults = defaultAccount(index);
       const legacyBay = normalizeTankBay(account?.tankBay);
-      const legacyUpgrades = { ...defaultUpgrades(), ...(account?.upgrades || {}) };
+      const legacyUpgrades = normalizeUpgrades(account?.upgrades);
       let activeTankSlot = clamp(Math.floor(Number(account?.activeTankSlot) || 0), 0, 2);
       const savedSlots = Array.isArray(account?.tankSlots) ? account.tankSlots : null;
       const normalizedSlots = Array.from({ length: 3 }, (_, slotIndex) => {
@@ -2113,7 +2132,7 @@
           unlocked: slotIndex === 0 || !!raw?.unlocked,
           tankOwned: slotIndex === 0 || !!raw?.unlocked || raw?.tankOwned === true,
           tankBay: normalizeTankBay(raw?.tankBay || (!savedSlots && slotIndex === 0 ? legacyBay : undefined)),
-          upgrades: { ...defaultUpgrades(), ...(raw?.upgrades || (!savedSlots && slotIndex === 0 ? legacyUpgrades : {})) },
+          upgrades: normalizeUpgrades(raw?.upgrades || (!savedSlots && slotIndex === 0 ? legacyUpgrades : {})),
           accuracyTraining: clamp(Math.floor(Number(raw?.accuracyTraining) || 0), 0, 3),
           trainingUntil: Math.max(0, Number(raw?.trainingUntil) || 0),
           trainingLevel: clamp(Math.floor(Number(raw?.trainingLevel) || 0), 0, 3),
@@ -2411,11 +2430,11 @@
 
     const tankParts = {
       tracks: {
-        standard: { name: "Standard Tracks", cost: 0, style: "classic", speed: 185, hpBonus: 0 },
-        wheels: { name: "Big Tires", cost: 75, style: "wheels", speed: 220, hpBonus: -20 },
-        heavy: { name: "Heavy Tracks", cost: 90, style: "heavy", speed: 150, hpBonus: 35 },
-        hover: { name: "Hovercraft", cost: 160, style: "hover", speed: 245, hpBonus: -38, waterGlide: true },
-        float: { name: "Float Pad", cost: 1000, style: "float", speed: 235, hpBonus: 10, waterGlide: true, floatDodge: true }
+        standard: { name: "Standard Tracks", cost: 0, style: "classic", speed: 58, hpBonus: 0 },
+        wheels: { name: "Big Tires", cost: 75, style: "wheels", speed: 85, hpBonus: -20 },
+        heavy: { name: "Heavy Tracks", cost: 90, style: "heavy", speed: 48, hpBonus: 35 },
+        hover: { name: "Hovercraft", cost: 160, style: "hover", speed: 105, hpBonus: -38, waterGlide: true },
+        float: { name: "Float Pad", cost: 1000, style: "float", speed: 100, hpBonus: 10, waterGlide: true, floatDodge: true }
       },
       guns: {
         standard: { name: "Standard Gun", cost: 0, damageBonus: 0, reloadBonus: 0, shellCount: 1, shellRadius: 7 },
@@ -2878,7 +2897,9 @@
       if (type === "paint") return level > 0 ? null : 500;
       if (type === "repairDrone") return [10000, 15000, 20000][level] ?? null;
       if (type === "reload") return [25, 45, 75][level] ?? null;
-      if (type === "speed") return [20, 35, 55][level] ?? null;
+      if (type === "speed") return [30, 55, 85][level] ?? null;
+      if (type === "bulletSpeed") return [20, 35, 55][level] ?? null;
+      if (type === "armor") return [35, 50, 70, 90, 115, 145, 180][level] ?? null;
       return [20, 40, 70][level] ?? null;
     }
 
@@ -2891,6 +2912,7 @@
       const rocketCost = upgradeCost("rocket");
       const reloadCost = upgradeCost("reload");
       const speedCost = upgradeCost("speed");
+      const bulletSpeedCost = upgradeCost("bulletSpeed");
       const airstrikeCost = upgradeCost("airstrike");
       const bombDropperCost = upgradeCost("bombDropper");
       const laserCost = upgradeCost("laser");
@@ -2902,10 +2924,11 @@
       hudBucks.textContent = game.steelBucks;
       upgradeBucksText.textContent = `${account.name} Steel Bucks: ${game.steelBucks}`;
       damageUpgradeText.textContent = `Level ${game.upgrades.damage}/3 - Shell damage +${game.upgrades.damage * 8}.`;
-      armorUpgradeText.textContent = `Level ${game.upgrades.armor}/3 - Health +${game.upgrades.armor * 25}, with extra armor plates.`;
+      armorUpgradeText.textContent = `Level ${game.upgrades.armor}/7 - +${game.upgrades.armor} hull hit${game.upgrades.armor === 1 ? "" : "s"}, with extra armor plates.`;
       rocketUpgradeText.textContent = game.upgrades.rocket ? "Equipped - Adds a slow side rocket launcher." : "Locked - Adds a slow-loading side rocket.";
       reloadUpgradeText.textContent = `Level ${game.upgrades.reload}/3 - Cannon reload ${game.upgrades.reload * 12}% faster.`;
-      speedUpgradeText.textContent = `Level ${game.upgrades.speed}/3 - Shell speed +${game.upgrades.speed * 55}.`;
+      speedUpgradeText.textContent = `Level ${game.upgrades.speed}/3 - Tank speed +${game.upgrades.speed * 20}.`;
+      bulletSpeedUpgradeText.textContent = `Level ${game.upgrades.bulletSpeed}/3 - Shell speed +${game.upgrades.bulletSpeed * 55}.`;
       airstrikeUpgradeText.textContent = game.upgrades.airstrike ? "Equipped - One huge missile strike per battle." : "Locked - Once per battle map missile.";
       bombDropperUpgradeText.textContent = game.upgrades.bombDropper ? "Equipped - Drop a rear bomb during battle." : "Locked - Drop bombs behind your tank.";
       laserUpgradeText.textContent = laserCost === "locked" ? "Locked - Buy the Laser Gun in Tank Bay first." : `Level ${game.upgrades.laser}/3 - Beam power +${game.upgrades.laser * 25}%.`;
@@ -2929,6 +2952,7 @@
       rocketUpgradeButton.textContent = rocketCost === null ? "Owned" : `Buy ${rocketCost}`;
       reloadUpgradeButton.textContent = reloadCost === null ? "Maxed" : `Buy ${reloadCost}`;
       speedUpgradeButton.textContent = speedCost === null ? "Maxed" : `Buy ${speedCost}`;
+      bulletSpeedUpgradeButton.textContent = bulletSpeedCost === null ? "Maxed" : `Buy ${bulletSpeedCost}`;
       airstrikeUpgradeButton.textContent = airstrikeCost === null ? "Owned" : `Buy ${airstrikeCost}`;
       bombDropperUpgradeButton.textContent = bombDropperCost === null ? "Owned" : `Buy ${bombDropperCost}`;
       laserUpgradeButton.textContent = laserCost === "locked" ? "Locked" : laserCost === null ? "Maxed" : `Buy ${laserCost}`;
@@ -2942,6 +2966,7 @@
       rocketUpgradeButton.disabled = rocketCost === null || game.steelBucks < rocketCost;
       reloadUpgradeButton.disabled = reloadCost === null || game.steelBucks < reloadCost;
       speedUpgradeButton.disabled = speedCost === null || game.steelBucks < speedCost;
+      bulletSpeedUpgradeButton.disabled = bulletSpeedCost === null || game.steelBucks < bulletSpeedCost;
       airstrikeUpgradeButton.disabled = airstrikeCost === null || game.steelBucks < airstrikeCost;
       bombDropperUpgradeButton.disabled = bombDropperCost === null || game.steelBucks < bombDropperCost;
       laserUpgradeButton.disabled = laserCost === "locked" || laserCost === null || game.steelBucks < laserCost;
@@ -3102,7 +3127,9 @@
         const armorLevel = account.upgrades.armor || 0;
         const damageLevel = account.upgrades.damage || 0;
         const reloadLevel = account.upgrades.reload || 0;
-        const maxHp = 100 + armorLevel * 25 + tankClass.hpBonus;
+        const moveSpeedLevel = account.upgrades.speed || 0;
+        const bulletSpeedLevel = account.upgrades.bulletSpeed || 0;
+        const maxHp = 72 + armorLevel * 24 + tankClass.hpBonus;
         const tankRadius = tankClass.style === "heavy" ? 30 : tankClass.style === "hover" ? 24 : tankClass.style === "float" ? 27 : 25;
         const spawn = safePlayerSpawn(mode, i, tankRadius);
         game.tanks.push(makeTank({
@@ -3124,9 +3151,9 @@
           hp: maxHp,
           maxHp,
           r: tankRadius,
-          speed: tankClass.speed,
-          bulletSpeed: tankClass.bulletSpeed || (450 + (account.upgrades.speed || 0) * 48),
-          bulletDamage: 25 + damageLevel * 8 + tankClass.damageBonus,
+          speed: tankClass.speed + moveSpeedLevel * 20,
+          bulletSpeed: tankClass.bulletSpeed || (280 + bulletSpeedLevel * 55),
+          bulletDamage: 24 + damageLevel * 8 + tankClass.damageBonus,
           reloadTime: tankClass.reloadTime || Math.max(.34, .58 - reloadLevel * .055 - tankClass.reloadBonus),
           shellCount: tankClass.shellCount || 1,
           shellRadius: tankClass.shellRadius || 7,
@@ -3983,7 +4010,7 @@
         speed: machine ? 138 : rocket ? 66 : purple ? 114 : level <= 5 ? 58 : 72,
         bulletSpeed: machine ? 435 : level <= 5 ? 280 : 340,
         reloadTime: machine ? 1.02 : rocket ? 2.7 : purple ? 1.18 : 1.72,
-        bulletDamage: machine ? 8 : rocket ? 12 : purple ? (level >= 17 ? 28 : 22) : (level >= 6 ? 25 : 14),
+        bulletDamage: machine ? 8 : rocket ? 12 : purple ? (level >= 17 ? 28 : 22) : (level >= 6 ? 25 : 24),
         shellCount: machine ? 2 : 1,
         shellRadius: machine ? 4 : 7,
         shellColor: "",
@@ -6410,8 +6437,6 @@
     }
 
     function trackedEnemyInView(tank, farthest = false) {
-      const locked = game.tanks.find((other) => other.id === tank.autoAimTargetId && other.alive && !other.buried && !sameTeam(other.team, tank.team));
-      if (locked) return locked;
       let best = null;
       let bestD = farthest ? -Infinity : Infinity;
       for (const other of game.tanks) {
@@ -6425,6 +6450,7 @@
         }
       }
       if (best) tank.autoAimTargetId = best.id;
+      else tank.autoAimTargetId = null;
       return best;
     }
 
