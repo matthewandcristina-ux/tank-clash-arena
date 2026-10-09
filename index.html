@@ -1257,7 +1257,7 @@
 
   <div id="mainMenu" class="screen active">
     <section class="menuPanel">
-      <h1 class="brand">Tank Clash <span id="promoLetter" class="promoLetter" role="button" tabindex="0" aria-label="Secret promo code">A</span>rena</h1>
+      <h1 class="brand">Tank <span id="tradeLetter" class="promoLetter" role="button" tabindex="0" aria-label="Open trade shop">C</span>lash <span id="promoLetter" class="promoLetter" role="button" tabindex="0" aria-label="Secret promo code">A</span>rena</h1>
       <p class="tagline">Choose who is playing. One selected account plays solo; two to four selected accounts unlock multiplayer.</p>
       <div class="accountGrid" id="accountGrid"></div>
       <div class="menuButtons">
@@ -1279,6 +1279,21 @@
       <input id="promoCodeInput" class="promoInput" type="text" maxlength="24" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Promo code">
       <button id="promoRedeemButton" class="bigButton" type="button">Redeem</button>
       <p id="promoResult" class="promoResult" aria-live="polite"></p>
+      <button class="smallButton alt" type="button" data-action="backMain">Back</button>
+    </section>
+  </div>
+
+  <div id="tradeMenu" class="screen">
+    <section class="menuPanel promoPanel">
+      <h1 class="brand">Trade</h1>
+      <p class="tagline" id="tradeBalance">Choose an amount to exchange.</p>
+      <label class="tagline" for="tradeAmount">Trade amount</label>
+      <input id="tradeAmount" class="promoInput" type="number" min="1" max="999" step="1" value="1" inputmode="numeric" aria-label="Trade amount">
+      <div class="menuButtons">
+        <button id="tradeGoldenToSteel" class="bigButton" type="button"></button>
+        <button id="tradeSteelToGolden" class="bigButton" type="button"></button>
+      </div>
+      <p id="tradeResult" class="promoResult" aria-live="polite"></p>
       <button class="smallButton alt" type="button" data-action="backMain">Back</button>
     </section>
   </div>
@@ -1543,6 +1558,7 @@
     const ctx = canvas.getContext("2d");
     const mainMenu = document.getElementById("mainMenu");
     const promoMenu = document.getElementById("promoMenu");
+    const tradeMenu = document.getElementById("tradeMenu");
     const multiMenu = document.getElementById("multiMenu");
     const upgradeMenu = document.getElementById("upgradeMenu");
     const tankBayMenu = document.getElementById("tankBayMenu");
@@ -1566,9 +1582,15 @@
     const siegeButton = document.getElementById("siegeButton");
     const blueRoomButton = document.getElementById("blueRoomButton");
     const promoLetter = document.getElementById("promoLetter");
+    const tradeLetter = document.getElementById("tradeLetter");
     const promoCodeInput = document.getElementById("promoCodeInput");
     const promoRedeemButton = document.getElementById("promoRedeemButton");
     const promoResult = document.getElementById("promoResult");
+    const tradeBalance = document.getElementById("tradeBalance");
+    const tradeAmount = document.getElementById("tradeAmount");
+    const tradeGoldenToSteel = document.getElementById("tradeGoldenToSteel");
+    const tradeSteelToGolden = document.getElementById("tradeSteelToGolden");
+    const tradeResult = document.getElementById("tradeResult");
     const menuButton = document.getElementById("menuButton");
     const goldenPrompt = document.getElementById("goldenPrompt");
     const goldenPromptText = document.getElementById("goldenPromptText");
@@ -1629,6 +1651,9 @@
     const WORLD_RAMP_CITY = { w: 1900, h: 980 };
     const WORLD_SIEGE = { w: 1680, h: 6200 };
     const BLUE_ROOM_MAX_LEVEL = 50;
+    const ORIGINAL_TANK_SPEED = 58;
+    const ORIGINAL_SHELL_SPEED = 280;
+    const HULL_DAMAGE = 24;
     const COLORS = {
       player: ["#2f6f54", "#9aa3ad", "#ff9f1c", "#8d41c7"],
       teamBlue: "#2d6cdf",
@@ -1737,6 +1762,7 @@
     function showScreen(screen) {
       mainMenu.classList.toggle("active", screen === "main");
       promoMenu.classList.toggle("active", screen === "promo");
+      tradeMenu.classList.toggle("active", screen === "trade");
       multiMenu.classList.toggle("active", screen === "multi");
       upgradeMenu.classList.toggle("active", screen === "upgrades");
       tankBayMenu.classList.toggle("active", screen === "tankBay");
@@ -1757,6 +1783,7 @@
         updateBlueRoomButton();
       }
       if (screen === "promo") renderPromoMenu();
+      if (screen === "trade") renderTradeMenu();
       if (screen === "multi") renderMultiplayerMenu();
       if (screen === "upgrades") renderUpgradeMenu();
       if (screen === "tankBay") renderTankBay();
@@ -1820,6 +1847,55 @@
       setTimeout(showMainMenu, 1100);
     }
 
+    function tradeAccount() {
+      return selectedAccounts()[0] || game.accounts[0];
+    }
+
+    function tradeCount() {
+      return clamp(Math.floor(Number(tradeAmount.value) || 1), 1, 999);
+    }
+
+    function openTradeMenu() {
+      showScreen("trade");
+    }
+
+    function renderTradeMenu() {
+      const account = tradeAccount();
+      const amount = tradeCount();
+      const steelCost = amount * 100;
+      tradeAmount.value = amount;
+      tradeBalance.innerHTML = `${escapeHtml(account.name)} has <span class="steelIcon" aria-hidden="true"></span>${account.steelBucks} Steel Bucks and <span class="tinyGoldenBullet" aria-hidden="true"></span>${account.goldenBullets || 0} Golden Bullets.`;
+      tradeGoldenToSteel.innerHTML = `<span class="tinyGoldenBullet" aria-hidden="true"></span>${amount} Golden${amount === 1 ? " Bullet" : " Bullets"} for <span class="steelIcon" aria-hidden="true"></span>${steelCost}`;
+      tradeSteelToGolden.innerHTML = `<span class="steelIcon" aria-hidden="true"></span>${steelCost} for <span class="tinyGoldenBullet" aria-hidden="true"></span>${amount} Golden${amount === 1 ? " Bullet" : " Bullets"}`;
+      tradeGoldenToSteel.disabled = (account.goldenBullets || 0) < amount;
+      tradeSteelToGolden.disabled = account.steelBucks < steelCost;
+      tradeResult.textContent = "1 Golden Bullet = 100 Steel Bucks.";
+    }
+
+    function tradeCurrency(direction) {
+      const account = tradeAccount();
+      const amount = tradeCount();
+      const steelValue = amount * 100;
+      if (direction === "goldToSteel") {
+        if ((account.goldenBullets || 0) < amount) return;
+        account.goldenBullets -= amount;
+        account.steelBucks += steelValue;
+        tradeResult.textContent = `Traded ${amount} Golden Bullet${amount === 1 ? "" : "s"} for ${steelValue} Steel Bucks.`;
+      } else {
+        if (account.steelBucks < steelValue) return;
+        account.steelBucks -= steelValue;
+        account.goldenBullets = (account.goldenBullets || 0) + amount;
+        tradeResult.textContent = `Traded ${steelValue} Steel Bucks for ${amount} Golden Bullet${amount === 1 ? "" : "s"}.`;
+      }
+      saveAccounts();
+      syncShopAccount();
+      renderAccounts();
+      updateCurrencyHud();
+      const result = tradeResult.textContent;
+      renderTradeMenu();
+      tradeResult.textContent = result;
+    }
+
     promoLetter.addEventListener("click", openPromoMenu);
     promoLetter.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -1831,6 +1907,16 @@
     promoCodeInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") redeemPromoCode();
     });
+    tradeLetter.addEventListener("click", openTradeMenu);
+    tradeLetter.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openTradeMenu();
+      }
+    });
+    tradeAmount.addEventListener("input", renderTradeMenu);
+    tradeGoldenToSteel.addEventListener("click", () => tradeCurrency("goldToSteel"));
+    tradeSteelToGolden.addEventListener("click", () => tradeCurrency("steelToGolden"));
 
     document.body.addEventListener("click", (e) => {
       const action = e.target.closest("button")?.dataset.action;
@@ -2430,7 +2516,7 @@
 
     const tankParts = {
       tracks: {
-        standard: { name: "Standard Tracks", cost: 0, style: "classic", speed: 58, hpBonus: 0 },
+        standard: { name: "Standard Tracks", cost: 0, style: "classic", speed: ORIGINAL_TANK_SPEED, hpBonus: 0 },
         wheels: { name: "Big Tires", cost: 75, style: "wheels", speed: 85, hpBonus: -20 },
         heavy: { name: "Heavy Tracks", cost: 90, style: "heavy", speed: 48, hpBonus: 35 },
         hover: { name: "Hovercraft", cost: 160, style: "hover", speed: 105, hpBonus: -38, waterGlide: true },
@@ -3129,7 +3215,7 @@
         const reloadLevel = account.upgrades.reload || 0;
         const moveSpeedLevel = account.upgrades.speed || 0;
         const bulletSpeedLevel = account.upgrades.bulletSpeed || 0;
-        const maxHp = 72 + armorLevel * 24 + tankClass.hpBonus;
+        const maxHp = HULL_DAMAGE * 3 + armorLevel * HULL_DAMAGE + tankClass.hpBonus;
         const tankRadius = tankClass.style === "heavy" ? 30 : tankClass.style === "hover" ? 24 : tankClass.style === "float" ? 27 : 25;
         const spawn = safePlayerSpawn(mode, i, tankRadius);
         game.tanks.push(makeTank({
@@ -3152,8 +3238,8 @@
           maxHp,
           r: tankRadius,
           speed: tankClass.speed + moveSpeedLevel * 20,
-          bulletSpeed: tankClass.bulletSpeed || (280 + bulletSpeedLevel * 55),
-          bulletDamage: 24 + damageLevel * 8 + tankClass.damageBonus,
+          bulletSpeed: tankClass.bulletSpeed || (ORIGINAL_SHELL_SPEED + bulletSpeedLevel * 55),
+          bulletDamage: HULL_DAMAGE + damageLevel * 8 + tankClass.damageBonus,
           reloadTime: tankClass.reloadTime || Math.max(.34, .58 - reloadLevel * .055 - tankClass.reloadBonus),
           shellCount: tankClass.shellCount || 1,
           shellRadius: tankClass.shellRadius || 7,
@@ -4007,10 +4093,10 @@
         tankStyle: machine ? "twin" : rocket ? "heavy" : "classic",
         hp: machine ? machineHp : rocket ? rocketHp : purple ? purpleHp : redHp,
         maxHp: machine ? machineHp : rocket ? rocketHp : purple ? purpleHp : redHp,
-        speed: machine ? 138 : rocket ? 66 : purple ? 114 : level <= 5 ? 58 : 72,
-        bulletSpeed: machine ? 435 : level <= 5 ? 280 : 340,
+        speed: machine ? 138 : rocket ? 66 : purple ? 114 : level <= 5 ? ORIGINAL_TANK_SPEED : 72,
+        bulletSpeed: machine ? 435 : level <= 5 ? ORIGINAL_SHELL_SPEED : 340,
         reloadTime: machine ? 1.02 : rocket ? 2.7 : purple ? 1.18 : 1.72,
-        bulletDamage: machine ? 8 : rocket ? 12 : purple ? (level >= 17 ? 28 : 22) : (level >= 6 ? 25 : 24),
+        bulletDamage: machine ? 8 : rocket ? 12 : purple ? (level >= 17 ? 28 : 22) : (level >= 6 ? 25 : HULL_DAMAGE),
         shellCount: machine ? 2 : 1,
         shellRadius: machine ? 4 : 7,
         shellColor: "",
