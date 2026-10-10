@@ -1374,7 +1374,8 @@
       .garageSettings { padding-inline: 8px; }
       .garageNav { top: 84px; width: calc(100% - 24px); justify-content: center; }
       .garageNav .smallButton { flex: 1; min-width: 0; padding: 6px 2px; font-size: .68rem; }
-      .garagePadPanel { bottom: max(14px, env(safe-area-inset-bottom)); width: min(185px, 46vw); }
+      .garagePadPanel { bottom: max(14px, env(safe-area-inset-bottom)); width: min(210px, 60vw); }
+      .garagePadPanel:not(.expanded) { width: auto; padding: 0; border: 0; background: none; }
     }
   </style>
 </head>
@@ -1888,7 +1889,7 @@
       nextModeAfterMessage: null,
       blueRoom: null,
       roundExit: null,
-      garage: { x: innerWidth < innerHeight ? 450 : 800, y: innerWidth < innerHeight ? 1500 : 690, angle: -Math.PI / 2, selectedPad: 0, accountId: null, move: { x: 0, y: 0 }, pointerId: null, returnFromBattle: false },
+      garage: { x: innerWidth < innerHeight ? 450 : 800, y: innerWidth < innerHeight ? 1500 : 690, angle: -Math.PI / 2, selectedPad: 0, accountId: null, move: { x: 0, y: 0 }, pointerId: null, returnFromBattle: false, panelExpanded: false },
       soundEnabled: loadSoundEnabled()
     };
 
@@ -1979,6 +1980,7 @@
     }
 
     function showMainMenu() {
+      game.garage.panelExpanded = false;
       showScreen("garage");
       touchLayer.classList.remove("split");
       game.ended = true;
@@ -2025,7 +2027,14 @@
         : training ? `Training ${slot.trainingLevel}: ${formatRemainingTime(slot.trainingUntil)}`
         : slot.repairPending ? "Bring the wreck to this pad"
         : broken ? `Repairing: ${formatRemainingTime(slot.wreckedUntil)}` : "Ready";
+      const compact = innerWidth <= 600 && !game.garage.panelExpanded;
+      garagePadPanel.classList.toggle("expanded", !compact);
+      if (compact) {
+        garagePadPanel.innerHTML = `<button class="smallButton" type="button" data-garage-action="expand">Tank ${index + 1}: ${status}</button>`;
+        return;
+      }
       let actions = "";
+      if (innerWidth <= 600) actions += `<button class="smallButton alt" type="button" data-garage-action="collapse">Close</button>`;
       if (!owned) actions = `<button class="smallButton" type="button" data-garage-action="buy" ${account.steelBucks < tankPurchaseCost(index) ? "disabled" : ""}>Buy Tank</button>`;
       else {
         if (index !== account.activeTankSlot && !training && !broken) actions += `<button class="smallButton" type="button" data-garage-action="use">Use Tank</button>`;
@@ -2040,6 +2049,7 @@
       const account = garageAccount();
       if (!account || index < 0 || index > 2) return;
       game.garage.selectedPad = index;
+      game.garage.panelExpanded = true;
       const slot = account.tankSlots[index];
       settleTankSlot(account, slot);
       if (tankSlotAvailable(slot) && account.activeTankSlot !== index) {
@@ -2052,6 +2062,11 @@
     garagePadPanel.addEventListener("click", (event) => {
       const action = event.target.closest("button")?.dataset.garageAction;
       if (!action) return;
+      if (action === "expand" || action === "collapse") {
+        game.garage.panelExpanded = action === "expand";
+        renderGarage();
+        return;
+      }
       const index = game.garage.selectedPad;
       if (action === "buy") buyTankInSlot(index);
       if (action === "use") useTankSlot(index);
