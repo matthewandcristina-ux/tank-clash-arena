@@ -1242,6 +1242,123 @@
         transform: scale(.72);
       }
     }
+    #garageUi {
+      pointer-events: none;
+      align-items: stretch;
+      justify-content: space-between;
+      color: #fff7df;
+    }
+
+    .garageHud {
+      position: absolute;
+      top: max(14px, env(safe-area-inset-top));
+      left: max(14px, env(safe-area-inset-left));
+      display: grid;
+      gap: 3px;
+      padding: 10px 14px;
+      border: 2px solid #8de9ff;
+      border-radius: 6px;
+      background: rgba(20, 33, 61, .92);
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .garageHud span { font-size: .76rem; color: #a9c3d1; }
+
+    .garageSettings {
+      position: absolute;
+      top: max(14px, env(safe-area-inset-top));
+      right: max(14px, env(safe-area-inset-right));
+      min-height: 48px;
+      padding: 8px 14px;
+      pointer-events: auto;
+    }
+
+    .garagePadPanel {
+      position: absolute;
+      right: max(14px, env(safe-area-inset-right));
+      bottom: max(14px, env(safe-area-inset-bottom));
+      width: min(290px, 48vw);
+      display: grid;
+      gap: 7px;
+      padding: 12px;
+      border: 2px solid #8de9ff;
+      border-radius: 6px;
+      background: rgba(20, 33, 61, .94);
+      pointer-events: auto;
+    }
+
+    .garagePadPanel strong { font-size: 1.1rem; }
+    .garagePadPanel span { color: #c4d6dc; font-size: .82rem; font-weight: 750; }
+    .garagePadPanel .smallButton { min-height: 36px; font-size: .78rem; }
+
+    .garageMove {
+      position: absolute;
+      left: max(18px, env(safe-area-inset-left));
+      bottom: max(18px, env(safe-area-inset-bottom));
+      width: 132px;
+      height: 132px;
+      border: 3px solid #8de9ff;
+      border-radius: 50%;
+      background: rgba(20, 33, 61, .56);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .garageMove::after {
+      content: "";
+      position: absolute;
+      top: calc(50% - 23px);
+      left: calc(50% - 23px);
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: #fff7df;
+      box-shadow: 0 0 0 3px #14213d;
+      transform: translate(var(--stick-x, 0px), var(--stick-y, 0px));
+    }
+
+    #settingsMenu { background: rgba(20, 33, 61, .56); }
+    #settingsMenu .menuPanel { width: min(94vw, 820px); }
+    #settingsMenu .accountGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    #roundStatus {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      left: 50%;
+      z-index: 3;
+      width: min(560px, 70vw);
+      padding: 8px 14px;
+      border: 2px solid #8de9ff;
+      border-radius: 6px;
+      background: rgba(20, 33, 61, .9);
+      color: #fff7df;
+      text-align: center;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    #roundStatus:not(.active) { display: none; }
+    #roundStatus strong, #roundStatus span { display: block; }
+    #roundStatus span { font-size: .78rem; color: #c4d6dc; }
+
+    .victoryConfetti {
+      position: absolute;
+      top: -25px;
+      width: 9px;
+      height: 18px;
+      background: var(--piece-color);
+      animation: victoryFall 2.2s ease-in forwards;
+    }
+
+    @keyframes victoryFall {
+      to { transform: translate(var(--fall-x), 108vh) rotate(640deg); opacity: 0; }
+    }
+
+    @media (max-width: 600px) {
+      #settingsMenu .accountGrid { grid-template-columns: 1fr; }
+      .garageMove { width: 106px; height: 106px; }
+      .garagePadPanel { top: 76px; bottom: auto; width: min(210px, 54vw); }
+    }
   </style>
 </head>
 <body>
@@ -1254,12 +1371,28 @@
     <div class="hudBlock"><span class="hudTitle" id="hudMissionTitle">Mission</span><span id="hudMission">Level 1</span></div>
     <div class="hudBlock"><span class="hudTitle">Steel Bucks</span><span id="hudBucks">0</span></div>
   </div>
+  <div id="roundStatus" aria-live="polite"><strong id="roundStatusTitle"></strong><span id="roundStatusText"></span></div>
 
-  <div id="mainMenu" class="screen active">
+  <div id="garageUi" class="screen active" aria-label="Tank garage">
+    <div class="garageHud"><strong id="garagePlayerName">Player 1</strong><span id="garageBalance">0 Steel Bucks</span></div>
+    <button id="garageSettingsButton" class="smallButton garageSettings" type="button">Settings</button>
+    <div id="garageMove" class="garageMove" aria-label="Move tank" role="group"></div>
+    <div id="garagePadPanel" class="garagePadPanel" aria-live="polite"></div>
+  </div>
+
+  <div id="settingsMenu" class="screen">
+    <section class="menuPanel">
+      <h1 class="brand">Settings</h1>
+      <button id="soundToggle" class="smallButton" type="button">Sound On</button>
+      <div class="accountGrid" id="accountGrid"></div>
+      <button class="smallButton alt" type="button" data-action="garage">Back</button>
+    </section>
+  </div>
+
+  <div id="mainMenu" class="screen">
     <section class="menuPanel">
       <h1 class="brand">Tank <span id="tradeLetter" class="promoLetter" role="button" tabindex="0" aria-label="Open trade shop">C</span>lash <span id="promoLetter" class="promoLetter" role="button" tabindex="0" aria-label="Secret promo code">A</span>rena</h1>
-      <p class="tagline">Choose who is playing. One selected account plays solo; two to four selected accounts unlock multiplayer.</p>
-      <div class="accountGrid" id="accountGrid"></div>
+      <p class="tagline">Choose a battle.</p>
       <div class="menuButtons">
         <button class="bigButton" data-action="single">Single Player</button>
         <button class="bigButton blueRoomButton hidden" data-action="blueRoom" id="blueRoomButton">Blue Room</button>
@@ -1268,6 +1401,7 @@
         <button class="bigButton" data-action="multiMenu">Multiplayer</button>
         <button class="bigButton" data-action="tankBay">Tank Bay</button>
         <button class="bigButton" data-action="upgrades">Upgrades</button>
+        <button class="smallButton alt" data-action="garage">Garage</button>
       </div>
     </section>
   </div>
@@ -1556,6 +1690,16 @@
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+    const garageUi = document.getElementById("garageUi");
+    const settingsMenu = document.getElementById("settingsMenu");
+    const garagePlayerName = document.getElementById("garagePlayerName");
+    const garageBalance = document.getElementById("garageBalance");
+    const garagePadPanel = document.getElementById("garagePadPanel");
+    const garageMove = document.getElementById("garageMove");
+    const soundToggle = document.getElementById("soundToggle");
+    const roundStatus = document.getElementById("roundStatus");
+    const roundStatusTitle = document.getElementById("roundStatusTitle");
+    const roundStatusText = document.getElementById("roundStatusText");
     const mainMenu = document.getElementById("mainMenu");
     const promoMenu = document.getElementById("promoMenu");
     const tradeMenu = document.getElementById("tradeMenu");
@@ -1668,8 +1812,13 @@
       hazard: "#ff9f1c"
     };
 
+    function loadSoundEnabled() {
+      try { return localStorage.getItem("tank-clash-sound-v1") !== "off"; }
+      catch { return true; }
+    }
+
     const game = {
-      state: "menu",
+      state: "garage",
       mode: "single",
       level: 1,
       wave: 1,
@@ -1715,7 +1864,10 @@
       cameraA: { x: 0, y: 0, scale: 1 },
       cameraB: { x: 0, y: 0, scale: 1 },
       nextModeAfterMessage: null,
-      blueRoom: null
+      blueRoom: null,
+      roundExit: null,
+      garage: { x: innerWidth < innerHeight ? 450 : 800, y: innerWidth < innerHeight ? 1500 : 690, angle: -Math.PI / 2, selectedPad: 0, accountId: null, move: { x: 0, y: 0 }, pointerId: null, returnFromBattle: false },
+      soundEnabled: loadSoundEnabled()
     };
 
     const input = [
@@ -1729,6 +1881,7 @@
     addEventListener("keydown", (e) => {
       keys.add(e.code);
       if (e.code === "Escape" && game.state === "playing") showMainMenu();
+      if (e.code === "Escape" && settingsMenu.classList.contains("active")) showScreen("garage");
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.code)) e.preventDefault();
     });
     addEventListener("keyup", (e) => keys.delete(e.code));
@@ -1748,6 +1901,12 @@
     }
 
     function resize() {
+      const portrait = innerWidth < innerHeight;
+      if (game.garage.portrait !== undefined && game.garage.portrait !== portrait) {
+        game.garage.x = portrait ? 450 : 800;
+        game.garage.y = portrait ? 1500 : 690;
+      }
+      game.garage.portrait = portrait;
       const dpr = Math.min(devicePixelRatio || 1, 2);
       canvas.width = Math.floor(innerWidth * dpr);
       canvas.height = Math.floor(innerHeight * dpr);
@@ -1760,6 +1919,8 @@
     resize();
 
     function showScreen(screen) {
+      garageUi.classList.toggle("active", screen === "garage");
+      settingsMenu.classList.toggle("active", screen === "settings");
       mainMenu.classList.toggle("active", screen === "main");
       promoMenu.classList.toggle("active", screen === "promo");
       tradeMenu.classList.toggle("active", screen === "trade");
@@ -1775,8 +1936,14 @@
       if (screen !== "game") game.airstrikeAim = null;
       centerMessage.classList.remove("active");
       goldenPrompt.classList.remove("active");
-      game.state = screen === "game" ? "playing" : "menu";
+      game.state = screen === "game" ? "playing" : screen === "garage" || screen === "settings" ? "garage" : "menu";
+      if (screen !== "game") roundStatus.classList.remove("active");
       syncShopAccount();
+      if (screen === "garage" || screen === "settings") renderGarage();
+      if (screen === "settings") {
+        renderAccounts();
+        soundToggle.textContent = game.soundEnabled ? "Sound On" : "Sound Off";
+      }
       if (screen === "main") {
         renderAccounts();
         updateSiegeButton();
@@ -1790,9 +1957,279 @@
     }
 
     function showMainMenu() {
-      showScreen("main");
+      showScreen("garage");
       touchLayer.classList.remove("split");
       game.ended = true;
+      game.roundExit = null;
+    }
+
+    function showArenaMenu() {
+      const account = garageAccount();
+      const slot = accountTankSlot(account);
+      settleTankSlot(account, slot);
+      if (!tankSlotAvailable(slot)) {
+        showScreen("garage");
+        return;
+      }
+      showScreen("main");
+      game.ended = true;
+    }
+
+    function garageLayout() {
+      const portrait = innerWidth < innerHeight;
+      return portrait
+        ? { w: 900, h: 1600, pads: [{ x: 450, y: 540 }, { x: 450, y: 920 }, { x: 450, y: 1300 }], tankDoorY: 680, upgradeDoorY: 1080 }
+        : { w: 1600, h: 900, pads: [{ x: 340, y: 500 }, { x: 800, y: 500 }, { x: 1260, y: 500 }], tankDoorY: 275, upgradeDoorY: 530 };
+    }
+
+    function garageAccount() {
+      const active = game.accounts[game.garage.accountId];
+      return active && game.selectedAccountIds.includes(active.id) ? active : selectedAccounts()[0];
+    }
+
+    function renderGarage() {
+      const account = garageAccount();
+      if (!account) return;
+      game.shopAccountId = account.id;
+      const index = game.garage.selectedPad;
+      const slot = account.tankSlots[index];
+      settleTankSlot(account, slot);
+      garagePlayerName.textContent = account.name;
+      garageBalance.textContent = `${account.steelBucks} Steel Bucks  |  ${account.goldenBullets || 0} Golden Bullets`;
+      const owned = !!slot.tankOwned;
+      const training = slot.trainingUntil > Date.now();
+      const broken = slot.repairPending || slot.wreckedUntil > Date.now();
+      const status = !owned ? `Buy for ${tankPurchaseCost(index)} Steel Bucks`
+        : training ? `Training ${slot.trainingLevel}: ${formatRemainingTime(slot.trainingUntil)}`
+        : slot.repairPending ? "Bring the wreck to this pad"
+        : broken ? `Repairing: ${formatRemainingTime(slot.wreckedUntil)}` : "Ready";
+      let actions = "";
+      if (!owned) actions = `<button class="smallButton" type="button" data-garage-action="buy" ${account.steelBucks < tankPurchaseCost(index) ? "disabled" : ""}>Buy Tank</button>`;
+      else {
+        if (index !== account.activeTankSlot && !training && !broken) actions += `<button class="smallButton" type="button" data-garage-action="use">Use Tank</button>`;
+        if (broken) actions += `<button class="smallButton" type="button" data-garage-action="repair" ${account.goldenBullets < 1 ? "disabled" : ""}>Repair: 1 Golden Bullet</button>`;
+        if (training) actions += `<button class="smallButton" type="button" data-garage-action="train" ${account.goldenBullets < slot.trainingLevel ? "disabled" : ""}>Skip: ${slot.trainingLevel} Golden</button>`;
+        else if (!broken && slot.accuracyTraining < 3) actions += `<button class="smallButton" type="button" data-garage-action="train">Train Accuracy</button>`;
+      }
+      garagePadPanel.innerHTML = `<strong>Tank ${index + 1}${account.activeTankSlot === index ? " - In Use" : ""}</strong><span>${status}${owned ? `  |  Accuracy ${slot.accuracyTraining}/3` : ""}</span>${actions}`;
+    }
+
+    function selectGaragePad(index) {
+      const account = garageAccount();
+      if (!account || index < 0 || index > 2) return;
+      game.garage.selectedPad = index;
+      const slot = account.tankSlots[index];
+      settleTankSlot(account, slot);
+      if (tankSlotAvailable(slot) && account.activeTankSlot !== index) {
+        useTankSlot(index);
+        game.garage.returnFromBattle = false;
+      }
+      renderGarage();
+    }
+
+    garagePadPanel.addEventListener("click", (event) => {
+      const action = event.target.closest("button")?.dataset.garageAction;
+      if (!action) return;
+      const index = game.garage.selectedPad;
+      if (action === "buy") buyTankInSlot(index);
+      if (action === "use") useTankSlot(index);
+      if (action === "repair") repairTankSlot(index);
+      if (action === "train") startOrSkipAccuracyTraining(index);
+      if (action === "buy" || action === "use" || action === "repair") {
+        const account = garageAccount();
+        if (account.activeTankSlot === index && tankSlotAvailable(account.tankSlots[index])) game.garage.returnFromBattle = false;
+      }
+      renderGarage();
+    });
+
+    document.getElementById("garageSettingsButton").addEventListener("click", () => showScreen("settings"));
+    soundToggle.addEventListener("click", () => {
+      game.soundEnabled = !game.soundEnabled;
+      try { localStorage.setItem("tank-clash-sound-v1", game.soundEnabled ? "on" : "off"); }
+      catch {}
+      soundToggle.textContent = game.soundEnabled ? "Sound On" : "Sound Off";
+    });
+
+    function garagePoint(event) {
+      const layout = garageLayout();
+      const scale = Math.min(innerWidth / layout.w, innerHeight / layout.h);
+      return { x: (event.clientX - (innerWidth - layout.w * scale) / 2) / scale, y: (event.clientY - (innerHeight - layout.h * scale) / 2) / scale };
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      if (game.state !== "garage" || !garageUi.classList.contains("active")) return;
+      const point = garagePoint(event);
+      const layout = garageLayout();
+      const pad = layout.pads.findIndex((position) => Math.hypot(position.x - point.x, position.y - point.y) < 150);
+      if (pad >= 0) return selectGaragePad(pad);
+      if (point.y < 165 && Math.abs(point.x - layout.w / 2) < 140) return showArenaMenu();
+      if (point.x < 150 && point.y > layout.tankDoorY - 45 && point.y < layout.tankDoorY + 190) return showScreen("tankBay");
+      if (point.x < 150 && point.y > layout.upgradeDoorY - 45 && point.y < layout.upgradeDoorY + 190) return showScreen("upgrades");
+    });
+
+    function setGarageStick(event) {
+      const box = garageMove.getBoundingClientRect();
+      const x = clamp((event.clientX - box.left - box.width / 2) / (box.width * .32), -1, 1);
+      const y = clamp((event.clientY - box.top - box.height / 2) / (box.height * .32), -1, 1);
+      const length = Math.max(1, Math.hypot(x, y));
+      game.garage.move = { x: x / length, y: y / length };
+      garageMove.style.setProperty("--stick-x", `${game.garage.move.x * box.width * .28}px`);
+      garageMove.style.setProperty("--stick-y", `${game.garage.move.y * box.height * .28}px`);
+    }
+
+    garageMove.addEventListener("pointerdown", (event) => {
+      game.garage.pointerId = event.pointerId;
+      garageMove.setPointerCapture(event.pointerId);
+      setGarageStick(event);
+    });
+    garageMove.addEventListener("pointermove", (event) => {
+      if (game.garage.pointerId === event.pointerId) setGarageStick(event);
+    });
+    const stopGarageStick = (event) => {
+      if (game.garage.pointerId !== event.pointerId) return;
+      game.garage.pointerId = null;
+      game.garage.move = { x: 0, y: 0 };
+      garageMove.style.setProperty("--stick-x", "0px");
+      garageMove.style.setProperty("--stick-y", "0px");
+    };
+    garageMove.addEventListener("pointerup", stopGarageStick);
+    garageMove.addEventListener("pointercancel", stopGarageStick);
+
+    function updateGarage(dt) {
+      if (!garageUi.classList.contains("active")) return;
+      const account = garageAccount();
+      const layout = garageLayout();
+      const slot = accountTankSlot(account);
+      settleTankSlot(account, slot);
+      const broken = game.garage.returnFromBattle && !tankSlotAvailable(slot);
+      if (!tankSlotAvailable(slot) && !game.garage.returnFromBattle) return;
+      const keyboard = keyboardControl(0).move;
+      const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : game.garage.move;
+      const length = Math.max(1, Math.hypot(move.x, move.y));
+      const tankClass = selectedTankClass(account);
+      const speed = broken ? 80 : Math.max(220, tankClass.speed * 2.4);
+      game.garage.x = clamp(game.garage.x + move.x / length * speed * dt, 135, layout.w - 135);
+      game.garage.y = clamp(game.garage.y + move.y / length * speed * dt, 145, layout.h - 95);
+      if (Math.hypot(move.x, move.y) > .08) game.garage.angle = lerpAngle(game.garage.angle, Math.atan2(move.y, move.x), 8 * dt);
+      if (game.garage.y < 190 && Math.abs(game.garage.x - layout.w / 2) < 115 && !broken) showArenaMenu();
+      if (game.garage.x < 180 && game.garage.y > layout.tankDoorY + 20 && game.garage.y < layout.tankDoorY + 145) showScreen("tankBay");
+      if (game.garage.x < 180 && game.garage.y > layout.upgradeDoorY + 20 && game.garage.y < layout.upgradeDoorY + 145) showScreen("upgrades");
+      for (let index = 0; index < layout.pads.length; index++) {
+        const pad = layout.pads[index];
+        if (broken && account.activeTankSlot === index && Math.hypot(game.garage.x - pad.x, game.garage.y - pad.y) < 94) {
+          if (slot.repairPending) {
+            slot.repairPending = false;
+            slot.wreckedUntil = Date.now() + 60_000;
+            saveAccounts();
+          }
+          game.garage.returnFromBattle = false;
+          game.garage.selectedPad = index;
+          renderGarage();
+          break;
+        }
+        if (Math.hypot(game.garage.x - pad.x, game.garage.y - pad.y) < 95 && game.garage.selectedPad !== index) selectGaragePad(index);
+      }
+    }
+
+    function garageTank(account, slot, x, y, angle, broken = false) {
+      const tankClass = buildTankClass(slot.tankBay);
+      const tank = makeTank({ id: "garage-tank", team: "players", controller: "human", playerIndex: 0,
+        x, y, color: tankClass.color, bodyColor: broken ? "#747d83" : tankClass.bodyColor,
+        topColor: broken ? "#59646e" : tankClass.topColor, trackColor: broken ? "#333e48" : tankClass.trackColor,
+        hp: 1, maxHp: 1, r: 25, tankStyle: tankClass.style, bodyStyle: tankClass.bodyStyle, gunStyle: tankClass.gunStyle });
+      tank.bodyAngle = angle;
+      tank.turretAngle = angle;
+      if (broken) tank.gunStyle = "broken";
+      return tank;
+    }
+
+    function drawGarage() {
+      const layout = garageLayout();
+      const scale = Math.min(innerWidth / layout.w, innerHeight / layout.h);
+      ctx.save();
+      ctx.fillStyle = "#172432";
+      ctx.fillRect(0, 0, innerWidth, innerHeight);
+      ctx.translate((innerWidth - layout.w * scale) / 2, (innerHeight - layout.h * scale) / 2);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#667e85";
+      ctx.fillRect(0, 0, layout.w, layout.h);
+      ctx.fillStyle = "#76919a";
+      ctx.fillRect(42, 42, layout.w - 84, layout.h - 84);
+      ctx.strokeStyle = "rgba(20,33,61,.13)";
+      ctx.lineWidth = 2;
+      for (let x = 100; x < layout.w; x += 100) { ctx.beginPath(); ctx.moveTo(x, 75); ctx.lineTo(x, layout.h - 70); ctx.stroke(); }
+      for (let y = 100; y < layout.h; y += 100) { ctx.beginPath(); ctx.moveTo(75, y); ctx.lineTo(layout.w - 75, y); ctx.stroke(); }
+      ctx.strokeStyle = "#263e4a";
+      ctx.lineWidth = 45;
+      ctx.strokeRect(22, 22, layout.w - 44, layout.h - 44);
+      ctx.strokeStyle = "#9cb9bf";
+      ctx.lineWidth = 7;
+      ctx.strokeRect(52, 52, layout.w - 104, layout.h - 104);
+      ctx.strokeStyle = "#364f5a";
+      ctx.lineWidth = 22;
+      for (const pad of layout.pads) {
+        ctx.beginPath(); ctx.moveTo(pad.x, pad.y + 125); ctx.lineTo(pad.x, layout.h - 90); ctx.lineTo(layout.w / 2, layout.h - 90); ctx.stroke();
+      }
+      ctx.strokeStyle = "#69d9e8";
+      ctx.lineWidth = 4;
+      for (const pad of layout.pads) {
+        ctx.beginPath(); ctx.moveTo(pad.x, pad.y + 125); ctx.lineTo(pad.x, layout.h - 90); ctx.lineTo(layout.w / 2, layout.h - 90); ctx.stroke();
+      }
+      const doors = [{ x: layout.w / 2 - 125, y: 25, w: 250, h: 115, label: "ARENA" },
+        { x: 25, y: layout.tankDoorY, w: 130, h: 170, label: "TANK" },
+        { x: 25, y: layout.upgradeDoorY, w: 130, h: 170, label: "UPGRADE" }];
+      for (const door of doors) {
+        ctx.fillStyle = "#172432"; ctx.fillRect(door.x, door.y, door.w, door.h);
+        ctx.strokeStyle = "#69d9e8"; ctx.lineWidth = 8; ctx.strokeRect(door.x, door.y, door.w, door.h);
+        ctx.fillStyle = "#fff7df"; ctx.textAlign = "center"; ctx.font = door.label === "UPGRADE" ? "900 19px system-ui" : "900 26px system-ui";
+        ctx.fillText(door.label, door.x + door.w / 2, door.y + door.h / 2 + 9);
+      }
+      const account = garageAccount();
+      for (let index = 0; index < layout.pads.length; index++) {
+        const pad = layout.pads[index];
+        const slot = account.tankSlots[index];
+        const selected = account.activeTankSlot === index;
+        ctx.fillStyle = selected ? "#425f68" : "#526d76";
+        ctx.strokeStyle = game.garage.selectedPad === index ? "#8de9ff" : "#203745";
+        ctx.lineWidth = 14;
+        ctx.beginPath(); ctx.arc(pad.x, pad.y, 137, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = "#9bb0b5"; ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.arc(pad.x, pad.y, 109, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "#fff7df"; ctx.textAlign = "center"; ctx.font = "900 22px system-ui";
+        ctx.fillText(`TANK ${index + 1}`, pad.x, pad.y + 112);
+        const broken = slot.repairPending || slot.wreckedUntil > Date.now();
+        const training = slot.trainingUntil > Date.now();
+        const arrivingWreck = index === account.activeTankSlot && game.garage.returnFromBattle;
+        if (slot.tankOwned && !arrivingWreck && (index !== account.activeTankSlot || !tankSlotAvailable(slot) || training)) {
+          const bounce = training ? Math.sin(performance.now() * .012) * 9 : 0;
+          ctx.save(); ctx.translate(pad.x, pad.y - 10 + bounce); ctx.scale(1.4, 1.4); ctx.translate(-pad.x, -(pad.y - 10 + bounce));
+          if (broken) drawBrokenExitTank(pad.x, pad.y - 10 + bounce, -Math.PI / 2);
+          else drawTank(garageTank(account, slot, pad.x, pad.y - 10 + bounce, -Math.PI / 2));
+          ctx.restore();
+        } else {
+          ctx.fillStyle = "#c1d0cf"; ctx.font = "900 56px system-ui"; ctx.fillText("+", pad.x, pad.y + 5);
+        }
+        if (training) {
+          ctx.fillStyle = "#ef476f"; ctx.fillRect(pad.x - 42, pad.y + 55, 84, 8);
+        }
+        if (broken && !arrivingWreck) {
+          ctx.strokeStyle = "#a8b8bb"; ctx.lineWidth = 12; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(pad.x - 130, pad.y - 75); ctx.lineTo(pad.x - 55, pad.y - 25);
+          ctx.moveTo(pad.x + 130, pad.y - 75); ctx.lineTo(pad.x + 55, pad.y - 25); ctx.stroke();
+          ctx.strokeStyle = "#69e7ff"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(pad.x - 53, pad.y - 25); ctx.lineTo(pad.x - 43, pad.y - 37); ctx.lineTo(pad.x - 35, pad.y - 19);
+          ctx.moveTo(pad.x + 53, pad.y - 25); ctx.lineTo(pad.x + 43, pad.y - 37); ctx.lineTo(pad.x + 35, pad.y - 19); ctx.stroke();
+        }
+      }
+      const activeSlot = accountTankSlot(account);
+      const broken = game.garage.returnFromBattle && !tankSlotAvailable(activeSlot);
+      if (tankSlotAvailable(activeSlot) || game.garage.returnFromBattle) {
+        ctx.save(); ctx.translate(game.garage.x, game.garage.y); ctx.scale(1.35, 1.35); ctx.translate(-game.garage.x, -game.garage.y);
+        if (broken) drawBrokenExitTank(game.garage.x, game.garage.y, game.garage.angle);
+        else drawTank(garageTank(account, activeSlot, game.garage.x, game.garage.y, game.garage.angle));
+        ctx.restore();
+      }
+      ctx.restore();
     }
 
     function promoAccount() {
@@ -1933,7 +2370,11 @@
       if (action === "capturePvp") requestStartGame("capturePvp");
       if (action === "captureBots") requestStartGame("captureBots");
       if (action === "team") requestStartGame("team");
-      if (action === "backMain") showMainMenu();
+      if (action === "garage") showMainMenu();
+      if (action === "backMain") {
+        if (multiMenu.classList.contains("active") || promoMenu.classList.contains("active") || tradeMenu.classList.contains("active")) showArenaMenu();
+        else showMainMenu();
+      }
     });
 
     document.body.addEventListener("click", (e) => {
@@ -2145,7 +2586,8 @@
         accuracyTraining: 0,
         trainingUntil: 0,
         trainingLevel: 0,
-        wreckedUntil: 0
+        wreckedUntil: 0,
+        repairPending: false
       };
     }
 
@@ -2197,9 +2639,9 @@
     function loadAccounts() {
       try {
         const saved = JSON.parse(localStorage.getItem("tank-clash-accounts-v3") || "null");
-        if (Array.isArray(saved) && saved.length >= 4) return saved.slice(0, 4).map(normalizeAccount);
+        if (Array.isArray(saved)) return Array.from({ length: 10 }, (_, index) => normalizeAccount(saved[index], index));
       } catch {}
-      return [0, 1, 2, 3].map(defaultAccount);
+      return Array.from({ length: 10 }, (_, index) => defaultAccount(index));
     }
 
     function normalizeAccount(account, index) {
@@ -2222,7 +2664,8 @@
           accuracyTraining: clamp(Math.floor(Number(raw?.accuracyTraining) || 0), 0, 3),
           trainingUntil: Math.max(0, Number(raw?.trainingUntil) || 0),
           trainingLevel: clamp(Math.floor(Number(raw?.trainingLevel) || 0), 0, 3),
-          wreckedUntil: Math.max(0, Number(raw?.wreckedUntil) || 0)
+          wreckedUntil: raw?.repairPending ? Date.now() + 60_000 : Math.max(0, Number(raw?.wreckedUntil) || 0),
+          repairPending: false
         };
       });
       if (!normalizedSlots[activeTankSlot].tankOwned) activeTankSlot = 0;
@@ -2297,7 +2740,7 @@
       try {
         const saved = JSON.parse(localStorage.getItem("tank-clash-selected-accounts-v3") || "null");
         if (Array.isArray(saved) && saved.length) {
-          const ids = [...new Set(saved.map(Number).filter((id) => Number.isInteger(id) && id >= 0 && id < 4))];
+          const ids = [...new Set(saved.map(Number).filter((id) => Number.isInteger(id) && id >= 0 && id < 10))];
           if (ids.length) return ids.slice(0, 4);
         }
       } catch {}
@@ -2380,7 +2823,7 @@
     }
 
     function tankSlotAvailable(slot) {
-      return !!slot?.unlocked && !!slot.tankOwned && (!slot.wreckedUntil || slot.wreckedUntil <= Date.now()) && (!slot.trainingUntil || slot.trainingUntil <= Date.now());
+      return !!slot?.unlocked && !!slot.tankOwned && !slot.repairPending && (!slot.wreckedUntil || slot.wreckedUntil <= Date.now()) && (!slot.trainingUntil || slot.trainingUntil <= Date.now());
     }
 
     function settleTankSlot(account, slot) {
@@ -2451,7 +2894,7 @@
         row.dataset.account = account.id;
         row.innerHTML = `
           <input maxlength="16" value="${escapeHtml(account.name)}" aria-label="Player ${account.id + 1} name">
-          <div class="accountMeta">${account.steelBucks} Steel Bucks - ${account.goldenBullets} Golden Bullets - Solo Level ${savedStageFor("single", [account])} - ${selected ? "Selected" : "Not selected"}</div>
+          <div class="accountMeta">${account.steelBucks} Steel Bucks - ${account.goldenBullets} Golden Bullets - ${escapeHtml(selectedTankClass(account).name)} - Level ${savedStageFor("single", [account])} - ${selected ? "Selected" : "Not selected"}</div>
           <button class="smallButton" type="button" data-account="${account.id}">${selected ? "Unselect" : "Select"}</button>
         `;
         const inputEl = row.querySelector("input");
@@ -2459,6 +2902,7 @@
           account.name = inputEl.value.trim() || `Player ${account.id + 1}`;
           saveAccounts();
           renderMultiplayerMenu();
+          renderGarage();
         });
         accountGrid.appendChild(row);
       });
@@ -2466,19 +2910,22 @@
 
     function toggleAccountSelection(id) {
       if (!Number.isInteger(id) || id < 0 || id >= game.accounts.length) return;
-      game.selectedAccountIds = [...new Set(game.selectedAccountIds.map(Number).filter((accountId) => Number.isInteger(accountId) && accountId >= 0 && accountId < 4))];
+      game.selectedAccountIds = [...new Set(game.selectedAccountIds.map(Number).filter((accountId) => Number.isInteger(accountId) && accountId >= 0 && accountId < game.accounts.length))];
       const selected = game.selectedAccountIds.includes(id);
       if (selected && game.selectedAccountIds.length > 1) {
         game.selectedAccountIds = game.selectedAccountIds.filter((accountId) => accountId !== id);
       } else if (!selected && game.selectedAccountIds.length < 4) {
-        game.selectedAccountIds.push(id);
+        game.selectedAccountIds.unshift(id);
+        game.garage.accountId = id;
       }
+      if (!game.selectedAccountIds.includes(game.garage.accountId)) game.garage.accountId = game.selectedAccountIds[0];
       saveSelectedAccountIds();
       syncShopAccount();
       updateSiegeButton();
       updateAccountSelectionVisuals();
       requestAnimationFrame(renderAccounts);
       renderMultiplayerMenu();
+      renderGarage();
     }
 
     function updateAccountSelectionVisuals() {
@@ -2489,7 +2936,7 @@
         row.classList.toggle("selected", selected);
         const meta = row.querySelector(".accountMeta");
         const button = row.querySelector("button");
-        if (meta) meta.textContent = `${account.steelBucks} Steel Bucks - ${account.goldenBullets} Golden Bullets - Solo Level ${savedStageFor("single", [account])} - ${selected ? "Selected" : "Not selected"}`;
+        if (meta) meta.textContent = `${account.steelBucks} Steel Bucks - ${account.goldenBullets} Golden Bullets - ${selectedTankClass(account).name} - Level ${savedStageFor("single", [account])} - ${selected ? "Selected" : "Not selected"}`;
         if (button) button.textContent = selected ? "Unselect" : "Select";
       });
     }
@@ -2608,14 +3055,15 @@
             <button class="smallButton" type="button" data-tank-slot-action="buyTank" data-tank-slot="${index}" ${!canAfford ? "disabled" : ""}>Buy Tank ${cost}</button>
           </div>`;
         }
-        const timer = slot.wreckedUntil > Date.now() ? `Repair in ${formatRemainingTime(slot.wreckedUntil)}` : "Ready";
+        const broken = slot.repairPending || slot.wreckedUntil > Date.now();
+        const timer = slot.repairPending ? "Return wreck to garage pad" : slot.wreckedUntil > Date.now() ? `Repair in ${formatRemainingTime(slot.wreckedUntil)}` : "Ready";
         const training = slot.trainingUntil > Date.now();
-        const status = slot.wreckedUntil > Date.now()
+        const status = broken
           ? `${timer}${account.goldenBullets ? " - Golden Bullet repairs now" : ""}`
           : "Ready";
         const action = training
           ? `<span class="tankSlotStatus">Training - unavailable in battle</span>`
-          : slot.wreckedUntil > Date.now()
+          : broken
           ? `<button class="smallButton alt" type="button" data-tank-slot-action="repair" data-tank-slot="${index}" ${account.goldenBullets < 1 ? "disabled" : ""}>Repair: 1 Golden</button>`
           : `<button class="smallButton" type="button" data-tank-slot-action="use" data-tank-slot="${index}" ${selected ? "disabled" : ""}>${selected ? "In Use" : "Use"}</button>`;
         const trainText = training
@@ -2623,7 +3071,7 @@
           : slot.accuracyTraining >= 3
             ? "Fully Trained"
             : `Train ${slot.accuracyTraining + 1}: ${slot.accuracyTraining + 1} min`;
-        const trainDisabled = slot.accuracyTraining >= 3 || (training && account.goldenBullets < slot.trainingLevel);
+        const trainDisabled = broken || slot.accuracyTraining >= 3 || (training && account.goldenBullets < slot.trainingLevel);
         return `<div class="tankSlotCard${selected ? " active" : ""}${training ? " training" : ""}">
           <canvas class="tankSlotPreview" width="180" height="90" data-tank-slot-preview="${index}" aria-label="${training ? `Tank ${index + 1} training` : `Tank ${index + 1} preview`}"></canvas>
           <strong class="tankSlotName">Tank ${index + 1}</strong>
@@ -2643,7 +3091,7 @@
     function drawTankSlotCondition(canvasEl, slot) {
       const pctx = canvasEl.getContext("2d");
       pctx.save();
-      if (slot.wreckedUntil > Date.now()) {
+      if (slot.repairPending || slot.wreckedUntil > Date.now()) {
         pctx.fillStyle = "rgba(20,33,61,.28)";
         pctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
         pctx.fillStyle = "#172033";
@@ -2712,9 +3160,10 @@
     function repairTankSlot(index) {
       const account = activeShopAccount();
       const slot = account.tankSlots[index];
-      if (!slot || !slot.unlocked || slot.wreckedUntil <= Date.now() || account.goldenBullets < 1) return;
+      if (!slot || !slot.unlocked || (!slot.repairPending && slot.wreckedUntil <= Date.now()) || account.goldenBullets < 1) return;
       account.goldenBullets -= 1;
       slot.wreckedUntil = 0;
+      slot.repairPending = false;
       account.activeTankSlot = index;
       account.tankBay = slot.tankBay;
       account.upgrades = slot.upgrades;
@@ -2727,7 +3176,7 @@
     function startOrSkipAccuracyTraining(index = activeShopAccount().activeTankSlot) {
       const account = activeShopAccount();
       const slot = account.tankSlots[index];
-      if (!slot?.unlocked || !slot.tankOwned) return;
+      if (!slot?.unlocked || !slot.tankOwned || slot.repairPending || slot.wreckedUntil > Date.now()) return;
       settleTankSlot(account, slot);
       if (slot.trainingUntil > Date.now()) {
         const cost = slot.trainingLevel;
@@ -2759,7 +3208,8 @@
           if (trainingNode.textContent !== label) trainingNode.textContent = label;
         }
         if (repairNode) {
-          const status = slot.wreckedUntil > Date.now()
+          const status = slot.repairPending ? "Return wreck to garage pad"
+            : slot.wreckedUntil > Date.now()
             ? `Repair in ${formatRemainingTime(slot.wreckedUntil)}${account.goldenBullets ? " - Golden Bullet repairs now" : ""}`
             : "Ready";
           if (repairNode.textContent !== status) repairNode.textContent = status;
@@ -2790,6 +3240,13 @@
         updateTankSlotCountdowns(activeShopAccount());
       }
       if (changed && upgradeMenu.classList.contains("active")) renderUpgradeMenu();
+      if (garageUi.classList.contains("active")) {
+        const second = Math.floor(Date.now() / 1000);
+        if (changed || game.garage.lastClockSecond !== second) {
+          game.garage.lastClockSecond = second;
+          renderGarage();
+        }
+      }
     }
 
     const paintPalette = ["#2f6f54", "#2d6cdf", "#8d41c7", "#ef476f", "#ff9f1c", "#f6fcff", "#51616d", "#172033", "#4f8f54", "#c58d4f"];
@@ -3199,6 +3656,7 @@
       game.obstacles = makeArena(isSoloMode(mode) || mode === "team" ? (isSoloMode(mode) ? game.level : game.wave) : game.wave, game.arenaMap);
       game.hazards = makeHazards(mode, isSoloMode(mode) || mode === "team" ? (isSoloMode(mode) ? game.level : game.wave) : game.wave);
       game.ended = false;
+      game.roundExit = null;
       game.pendingWinCheck = false;
       game.pendingRoundEnd = null;
       game.shake = 0;
@@ -3264,6 +3722,7 @@
           gunStyle: tankClass.gunStyle
         }));
       }
+      game.entryDoor = game.tanks[0] ? { x: game.tanks[0].x, y: game.tanks[0].y } : null;
 
       if (mode === "versus") {
         game.tanks.forEach((tank, index) => tank.team = "p" + (index + 1));
@@ -3337,7 +3796,7 @@
     }
 
     function updateCurrencyHud() {
-      const accounts = game.activePlayers.length ? game.activePlayers : [currentShopAccount()];
+      const accounts = game.activePlayers.length ? game.activePlayers : [activeShopAccount()];
       hudBucks.innerHTML = accounts.map((account) => `
         <span class="currencyLine">${escapeHtml(account.name)}:
           <span class="steelIcon" aria-hidden="true"></span>${account.steelBucks}
@@ -4623,6 +5082,14 @@
 
     function update(dt) {
       updateTankSlotClocks(dt);
+      if (game.state === "garage") {
+        updateGarage(dt);
+        return;
+      }
+      if (game.roundExit) {
+        updateRoundExit(dt);
+        return;
+      }
       if (game.state !== "playing" || game.ended) return;
       if (game.pendingRoundEnd) {
         flushPendingRoundEnd();
@@ -5487,6 +5954,15 @@
       helper.hp = Math.max(1, helper.hp - reviveHealth);
       tank.hp = Math.min(tank.maxHp, reviveHealth);
       tank.alive = true;
+      if (tank.controller === "human") {
+        const account = game.accounts[tank.accountId];
+        const slot = accountTankSlot(account, tank.tankSlotIndex);
+        if (slot) {
+          slot.repairPending = false;
+          slot.wreckedUntil = 0;
+          saveAccounts();
+        }
+      }
       tank.x = wreck.x;
       tank.y = wreck.y;
       tank.vx = 0;
@@ -6355,7 +6831,8 @@
           const account = game.accounts[tank.accountId];
           const slot = accountTankSlot(account, tank.tankSlotIndex);
           if (slot) {
-            slot.wreckedUntil = Date.now() + 60_000;
+            slot.repairPending = true;
+            slot.wreckedUntil = 0;
             saveAccounts();
           }
         }
@@ -7033,6 +7510,7 @@
     }
 
     function playTone(freq, duration, type, volume, delay = 0) {
+      if (!game.soundEnabled) return;
       const audio = getAudioContext();
       if (!audio) return;
       const osc = audio.createOscillator();
@@ -7050,6 +7528,7 @@
     }
 
     function playNoiseBurst(duration, volume, filterFreq = 170, delay = 0, filterType = "lowpass") {
+      if (!game.soundEnabled) return;
       const audio = getAudioContext();
       if (!audio) return;
       const start = audio.currentTime + delay;
@@ -7116,6 +7595,20 @@
       game.shake = 0;
       game.bullets = [];
       game.particles = [];
+      game.airstrikes = [];
+      game.wrecks = [];
+      game.hazards = [];
+      game.tanks = game.tanks.filter((tank) => tank.controller === "human");
+      for (const tank of game.tanks) {
+        tank.laserSegments = [];
+        tank.laserTime = 0;
+        if (!tank.alive) {
+          const account = game.accounts[tank.accountId];
+          const slot = accountTankSlot(account, tank.tankSlotIndex);
+          if (slot && slot.wreckedUntil <= Date.now()) slot.repairPending = true;
+        }
+      }
+      saveAccounts();
       game.mapSpinTimer = 0;
       hud.classList.remove("pickingMap");
       touchLayer.classList.remove("pickingMap");
@@ -7124,23 +7617,66 @@
       updateMineButtons();
       updateGoldenButtons();
       updateCurrencyHud();
-      messageTitle.textContent = title;
-      messageText.textContent = text;
-      continueButton.textContent = flow === "next" ? "Next Battle" : flow === "menu" ? "Main Menu" : "Play Again";
-      if (game.mode === "blueRoom") {
-        continueButton.classList.add("hidden");
-        menuButton.textContent = "Go Back Home";
+      const won = flow === "next" || /victory|won|wins|reached|captured/i.test(title);
+      game.roundExit = { title, text, won, time: 0, door: game.entryDoor || { x: WORLD.w / 2, y: WORLD.h - 140 } };
+      roundStatusTitle.textContent = title;
+      roundStatusText.textContent = `${text} Return to the entrance door.`;
+      roundStatus.classList.add("active");
+      centerMessage.classList.remove("active");
+      if (won) {
+        playTone(392, .13, "triangle", .18);
+        playTone(523, .13, "triangle", .18, .14);
+        playTone(659, .23, "triangle", .22, .28);
+        for (let index = 0; index < 28; index++) {
+          const piece = document.createElement("i");
+          piece.className = "victoryConfetti";
+          piece.style.left = `${8 + Math.random() * 84}%`;
+          piece.style.setProperty("--fall-x", `${(Math.random() - .5) * 160}px`);
+          piece.style.setProperty("--piece-color", ["#ff9f1c", "#2ec4b6", "#69e7ff", "#ef476f"][index % 4]);
+          rewardLayer.appendChild(piece);
+          piece.addEventListener("animationend", () => piece.remove(), { once: true });
+        }
       } else {
-        continueButton.classList.remove("hidden");
-        menuButton.textContent = "Main Menu";
+        playTone(196, .2, "triangle", .16);
+        playTone(147, .3, "triangle", .13, .19);
       }
-      siegeContinueButton.classList.toggle("hidden", !(flow === "next" && game.mode === "single" && game.level === 10));
-      game.nextModeAfterMessage = flow;
-      centerMessage.classList.add("active");
+    }
+
+    function updateRoundExit(dt) {
+      const exit = game.roundExit;
+      exit.time += dt;
+      for (const tank of game.tanks) {
+        const keyboard = keyboardControl(tank.playerIndex).move;
+        const pad = input[tank.playerIndex];
+        const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : pad.move;
+        const originalSpeed = tank.speed;
+        if (!tank.alive) tank.speed = 105;
+        moveTank(tank, move.x, move.y, dt);
+        tank.speed = originalSpeed;
+        if (exit.time > 1.5 && Math.hypot(tank.x - exit.door.x, tank.y - exit.door.y) < 68) {
+          game.garage.x = innerWidth < innerHeight ? 450 : 800;
+          game.garage.y = 200;
+          game.garage.angle = Math.PI / 2;
+          game.garage.selectedPad = tank.tankSlotIndex;
+          game.garage.accountId = tank.accountId;
+          game.selectedAccountIds = [tank.accountId, ...game.selectedAccountIds.filter((id) => id !== tank.accountId)].slice(0, 4);
+          saveSelectedAccountIds();
+          const account = game.accounts[tank.accountId];
+          game.garage.returnFromBattle = !tank.alive && !tankSlotAvailable(accountTankSlot(account, tank.tankSlotIndex));
+          showMainMenu();
+          return;
+        }
+      }
+      updateParticles(dt);
+      updateTrackMarks(dt);
     }
 
     function draw() {
       ctx.clearRect(0, 0, innerWidth, innerHeight);
+      if (game.state === "garage") {
+        drawGarage();
+        return;
+      }
       if (game.state === "playing" && game.mapSpinTimer > 0) {
         drawMapSpinner();
         return;
@@ -7360,6 +7896,7 @@
       ctx.translate(-camera.x, -camera.y);
 
       drawArenaFloor();
+      if (game.entryDoor) drawBattleDoor();
       if (game.mode === "blueRoom") drawBlueRoomCore();
       drawTrackMarks();
       for (const terrain of game.terrain) drawTerrain(terrain);
@@ -7375,12 +7912,55 @@
       for (const strike of game.airstrikes) drawAirstrikeMissile(strike);
       if (game.mode === "siege") drawSiegeEffects();
       for (const tank of game.tanks) if (tank.alive) drawTank(tank);
+      if (game.roundExit) for (const tank of game.tanks) if (tank.controller === "human" && !tank.alive) drawBrokenExitTank(tank.x, tank.y, tank.bodyAngle);
       for (const tank of game.tanks) if (tank.alive) drawHealth(tank);
       if (game.mode === "blueRoom") drawBlueRoomForceField();
       if (game.airstrikeAim) drawAirstrikeAim(game.airstrikeAim);
       drawParticles();
       ctx.restore();
       if (game.capture) drawCaptureScoreboard(viewport);
+    }
+
+    function drawBattleDoor() {
+      const door = game.entryDoor;
+      ctx.save();
+      ctx.translate(door.x, door.y);
+      ctx.fillStyle = "rgba(20,33,61,.25)";
+      roundRect(-73, -61, 146, 122, 8);
+      ctx.fill();
+      ctx.fillStyle = game.roundExit ? "#203b49" : "#39596a";
+      roundRect(-64, -54, 128, 108, 6);
+      ctx.fill();
+      ctx.strokeStyle = game.roundExit ? "#8de9ff" : "#83aeb5";
+      ctx.lineWidth = 7;
+      ctx.stroke();
+      ctx.fillStyle = "#fff7df";
+      ctx.font = "900 15px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(game.roundExit ? "GARAGE" : "ENTRANCE", 0, 42);
+      ctx.restore();
+    }
+
+    function drawBrokenExitTank(x, y, angle) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "rgba(20,33,61,.24)";
+      ctx.beginPath(); ctx.arc(0, 8, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(angle);
+      ctx.fillStyle = "#263442";
+      roundRect(-31, -24, 62, 48, 7); ctx.fill();
+      ctx.fillStyle = "#4b5964";
+      for (let offset = -22; offset <= 18; offset += 10) ctx.fillRect(offset, -24, 5, 48);
+      ctx.fillStyle = "#77828a";
+      ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#35434e"; ctx.lineWidth = 5; ctx.stroke();
+      ctx.fillStyle = "#3c4a55";
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#172432";
+      for (const [holeX, holeY] of [[-8, -8], [9, 5], [3, -11]]) {
+        ctx.beginPath(); ctx.arc(holeX, holeY, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
     }
 
     function drawCapturePoint() {
@@ -10356,6 +10936,7 @@
     syncShopAccount();
     renderAccounts();
     renderMultiplayerMenu();
+    renderGarage();
     requestAnimationFrame(loop);
   </script>
 </body>
