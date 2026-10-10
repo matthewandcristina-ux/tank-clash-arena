@@ -1274,6 +1274,18 @@
       pointer-events: auto;
     }
 
+    .garageNav {
+      position: absolute;
+      top: 150px;
+      left: 50%;
+      display: flex;
+      gap: 7px;
+      transform: translateX(-50%);
+      pointer-events: auto;
+    }
+
+    .garageNav .smallButton { min-height: 42px; white-space: nowrap; }
+
     .garagePadPanel {
       position: absolute;
       right: max(14px, env(safe-area-inset-right));
@@ -1357,7 +1369,12 @@
     @media (max-width: 600px) {
       #settingsMenu .accountGrid { grid-template-columns: 1fr; }
       .garageMove { width: 106px; height: 106px; }
-      .garagePadPanel { top: 76px; bottom: auto; width: min(210px, 54vw); }
+      .garageHud { width: calc(100% - 135px); font-size: .82rem; }
+      .garageHud span { line-height: 1.15; overflow-wrap: anywhere; }
+      .garageSettings { padding-inline: 8px; }
+      .garageNav { top: 84px; width: calc(100% - 24px); justify-content: center; }
+      .garageNav .smallButton { flex: 1; min-width: 0; padding: 6px 2px; font-size: .68rem; }
+      .garagePadPanel { bottom: max(14px, env(safe-area-inset-bottom)); width: min(185px, 46vw); }
     }
   </style>
 </head>
@@ -1376,6 +1393,11 @@
   <div id="garageUi" class="screen active" aria-label="Tank garage">
     <div class="garageHud"><strong id="garagePlayerName">Player 1</strong><span id="garageBalance">0 Steel Bucks</span></div>
     <button id="garageSettingsButton" class="smallButton garageSettings" type="button">Settings</button>
+    <nav class="garageNav" aria-label="Garage doors">
+      <button class="smallButton" type="button" data-action="arena">Arena</button>
+      <button class="smallButton" type="button" data-action="tankBay">Tank Bay</button>
+      <button class="smallButton" type="button" data-action="upgrades">Upgrades</button>
+    </nav>
     <div id="garageMove" class="garageMove" aria-label="Move tank" role="group"></div>
     <div id="garagePadPanel" class="garagePadPanel" aria-live="polite"></div>
   </div>
@@ -2363,6 +2385,7 @@
       if (action === "siege") requestStartGame("siege");
       if (action === "capture") requestStartGame("capture");
       if (action === "multiMenu") showScreen("multi");
+      if (action === "arena") showArenaMenu();
       if (action === "upgrades") showScreen("upgrades");
       if (action === "tankBay") showScreen("tankBay");
       if (action === "versus") requestStartGame("versus");
