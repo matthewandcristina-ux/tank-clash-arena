@@ -1299,6 +1299,7 @@
     #touchLayer.garageControls .controlZone.p1 .launcherButton,
     #touchLayer.garageControls .controlZone.p1 .goldenButton,
     #touchLayer.garageControls .controlZone.p1 .barricadeButton { display: none; }
+    #touchLayer.garageControls .controlZone.p1::before { display: none; }
 
     #settingsMenu { background: rgba(20, 33, 61, .56); }
     #settingsMenu .menuPanel { width: min(94vw, 820px); }
@@ -2090,11 +2091,22 @@
       if (!broken && (input[0].firing || keys.has("Space")) && game.garage.shotCooldown <= 0) {
         const angle = game.garage.angle;
         const bulletSpeed = tankClass.bulletSpeed || (ORIGINAL_SHELL_SPEED + (account.upgrades.bulletSpeed || 0) * 55);
-        game.garage.shots.push({ x: game.garage.x + Math.cos(angle) * 42, y: game.garage.y + Math.sin(angle) * 42,
-          vx: Math.cos(angle) * bulletSpeed, vy: Math.sin(angle) * bulletSpeed, life: 1.25 });
+        const count = tankClass.shellCount === 2 ? 2 : 1;
+        for (let index = 0; index < count; index++) {
+          const offset = count === 2 ? (index ? 9 : -9) : 0;
+          const x = game.garage.x + Math.cos(angle) * 42 - Math.sin(angle) * offset;
+          const y = game.garage.y + Math.sin(angle) * 42 + Math.cos(angle) * offset;
+          const dx = Math.cos(angle), dy = Math.sin(angle);
+          const wallDistance = Math.min(
+            Math.abs(dx) < 1e-6 ? Infinity : (dx > 0 ? layout.w - 50 - x : 50 - x) / dx,
+            Math.abs(dy) < 1e-6 ? Infinity : (dy > 0 ? layout.h - 50 - y : 50 - y) / dy
+          );
+          game.garage.shots.push({ x, y, vx: Math.cos(angle) * bulletSpeed, vy: Math.sin(angle) * bulletSpeed,
+            radius: tankClass.shellRadius, laser: tankClass.laserGun, length: Math.max(0, wallDistance), life: tankClass.laserGun ? .14 : 1.25 });
+        }
         game.garage.shotCooldown = tankClass.reloadTime || Math.max(.34, .58 - (account.upgrades.reload || 0) * .055 - tankClass.reloadBonus);
       }
-      for (const shot of game.garage.shots) { shot.x += shot.vx * dt; shot.y += shot.vy * dt; shot.life -= dt; }
+      for (const shot of game.garage.shots) { if (!shot.laser) { shot.x += shot.vx * dt; shot.y += shot.vy * dt; } shot.life -= dt; }
       game.garage.shots = game.garage.shots.filter((shot) => shot.life > 0 && shot.x > 50 && shot.x < layout.w - 50 && shot.y > 50 && shot.y < layout.h - 50);
       if (game.garage.y < 190 && Math.abs(game.garage.x - layout.w / 2) < 115 && !broken) showArenaMenu();
       if (game.garage.x < 180 && game.garage.y > layout.tankDoorY + 20 && game.garage.y < layout.tankDoorY + 145) showScreen("tankBay");
@@ -2253,9 +2265,16 @@
         ctx.restore();
       }
       for (const shot of game.garage.shots) {
-        ctx.strokeStyle = "#9fe8f5"; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(shot.x - shot.vx * .018, shot.y - shot.vy * .018); ctx.lineTo(shot.x, shot.y); ctx.stroke();
-        ctx.fillStyle = "#fff1b8"; ctx.beginPath(); ctx.arc(shot.x, shot.y, 5, 0, Math.PI * 2); ctx.fill();
+        if (shot.laser) {
+          const distance = Math.hypot(shot.vx, shot.vy) || 1;
+          ctx.strokeStyle = "#7beaff"; ctx.lineWidth = 8;
+          ctx.beginPath(); ctx.moveTo(shot.x, shot.y); ctx.lineTo(shot.x + shot.vx / distance * shot.length, shot.y + shot.vy / distance * shot.length); ctx.stroke();
+          ctx.strokeStyle = "#e6ffff"; ctx.lineWidth = 3; ctx.stroke();
+        } else {
+          ctx.strokeStyle = "#9fe8f5"; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(shot.x - shot.vx * .018, shot.y - shot.vy * .018); ctx.lineTo(shot.x, shot.y); ctx.stroke();
+          ctx.fillStyle = "#fff1b8"; ctx.beginPath(); ctx.arc(shot.x, shot.y, shot.radius || 5, 0, Math.PI * 2); ctx.fill();
+        }
       }
       ctx.restore();
     }
