@@ -1274,22 +1274,10 @@
       pointer-events: auto;
     }
 
-    .garageNav {
-      position: absolute;
-      top: 150px;
-      left: 50%;
-      display: flex;
-      gap: 7px;
-      transform: translateX(-50%);
-      pointer-events: auto;
-    }
-
-    .garageNav .smallButton { min-height: 42px; white-space: nowrap; }
-
     .garagePadPanel {
       position: absolute;
       right: max(14px, env(safe-area-inset-right));
-      bottom: max(14px, env(safe-area-inset-bottom));
+      bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px);
       width: min(290px, 48vw);
       display: grid;
       gap: 7px;
@@ -1304,31 +1292,13 @@
     .garagePadPanel span { color: #c4d6dc; font-size: .82rem; font-weight: 750; }
     .garagePadPanel .smallButton { min-height: 36px; font-size: .78rem; }
 
-    .garageMove {
-      position: absolute;
-      left: max(18px, env(safe-area-inset-left));
-      bottom: max(18px, env(safe-area-inset-bottom));
-      width: 132px;
-      height: 132px;
-      border: 3px solid #8de9ff;
-      border-radius: 50%;
-      background: rgba(20, 33, 61, .56);
-      pointer-events: auto;
-      touch-action: none;
-    }
-
-    .garageMove::after {
-      content: "";
-      position: absolute;
-      top: calc(50% - 23px);
-      left: calc(50% - 23px);
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      background: #fff7df;
-      box-shadow: 0 0 0 3px #14213d;
-      transform: translate(var(--stick-x, 0px), var(--stick-y, 0px));
-    }
+    #touchLayer.garageControls .controlZone.p1 .aimStick,
+    #touchLayer.garageControls .controlZone.p1 .targetButton,
+    #touchLayer.garageControls .controlZone.p1 .mineButton,
+    #touchLayer.garageControls .controlZone.p1 .airstrikeButton,
+    #touchLayer.garageControls .controlZone.p1 .launcherButton,
+    #touchLayer.garageControls .controlZone.p1 .goldenButton,
+    #touchLayer.garageControls .controlZone.p1 .barricadeButton { display: none; }
 
     #settingsMenu { background: rgba(20, 33, 61, .56); }
     #settingsMenu .menuPanel { width: min(94vw, 820px); }
@@ -1368,13 +1338,10 @@
 
     @media (max-width: 600px) {
       #settingsMenu .accountGrid { grid-template-columns: 1fr; }
-      .garageMove { width: 106px; height: 106px; }
       .garageHud { width: calc(100% - 135px); font-size: .82rem; }
       .garageHud span { line-height: 1.15; overflow-wrap: anywhere; }
       .garageSettings { padding-inline: 8px; }
-      .garageNav { top: 84px; width: calc(100% - 24px); justify-content: center; }
-      .garageNav .smallButton { flex: 1; min-width: 0; padding: 6px 2px; font-size: .68rem; }
-      .garagePadPanel { bottom: max(14px, env(safe-area-inset-bottom)); width: min(210px, 60vw); }
+      .garagePadPanel { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 104px); width: min(210px, 60vw); }
       .garagePadPanel:not(.expanded) { width: auto; padding: 0; border: 0; background: none; }
     }
   </style>
@@ -1394,12 +1361,6 @@
   <div id="garageUi" class="screen active" aria-label="Tank garage">
     <div class="garageHud"><strong id="garagePlayerName">Player 1</strong><span id="garageBalance">0 Steel Bucks</span></div>
     <button id="garageSettingsButton" class="smallButton garageSettings" type="button">Settings</button>
-    <nav class="garageNav" aria-label="Garage doors">
-      <button class="smallButton" type="button" data-action="arena">Arena</button>
-      <button class="smallButton" type="button" data-action="tankBay">Tank Bay</button>
-      <button class="smallButton" type="button" data-action="upgrades">Upgrades</button>
-    </nav>
-    <div id="garageMove" class="garageMove" aria-label="Move tank" role="group"></div>
     <div id="garagePadPanel" class="garagePadPanel" aria-live="polite"></div>
   </div>
 
@@ -1718,7 +1679,6 @@
     const garagePlayerName = document.getElementById("garagePlayerName");
     const garageBalance = document.getElementById("garageBalance");
     const garagePadPanel = document.getElementById("garagePadPanel");
-    const garageMove = document.getElementById("garageMove");
     const soundToggle = document.getElementById("soundToggle");
     const roundStatus = document.getElementById("roundStatus");
     const roundStatusTitle = document.getElementById("roundStatusTitle");
@@ -1889,7 +1849,7 @@
       nextModeAfterMessage: null,
       blueRoom: null,
       roundExit: null,
-      garage: { x: innerWidth < innerHeight ? 450 : 800, y: innerWidth < innerHeight ? 1500 : 690, angle: -Math.PI / 2, selectedPad: 0, accountId: null, move: { x: 0, y: 0 }, pointerId: null, returnFromBattle: false, panelExpanded: false },
+      garage: { x: innerWidth < innerHeight ? 450 : 800, y: innerWidth < innerHeight ? 1500 : 690, angle: -Math.PI / 2, selectedPad: 0, accountId: null, returnFromBattle: false, panelExpanded: false, shots: [], shotCooldown: 0 },
       soundEnabled: loadSoundEnabled()
     };
 
@@ -1942,6 +1902,10 @@
     resize();
 
     function showScreen(screen) {
+      if (screen === "garage" && (tankBayMenu.classList.contains("active") || upgradeMenu.classList.contains("active") || settingsMenu.classList.contains("active"))) {
+        game.garage.x = Math.max(game.garage.x, 230);
+      }
+      if (screen === "garage" && mainMenu.classList.contains("active")) game.garage.y = Math.max(game.garage.y, 235);
       garageUi.classList.toggle("active", screen === "garage");
       settingsMenu.classList.toggle("active", screen === "settings");
       mainMenu.classList.toggle("active", screen === "main");
@@ -1951,11 +1915,12 @@
       upgradeMenu.classList.toggle("active", screen === "upgrades");
       tankBayMenu.classList.toggle("active", screen === "tankBay");
       hud.classList.toggle("active", screen === "game");
-      touchLayer.classList.toggle("active", screen === "game");
+      touchLayer.classList.toggle("active", screen === "game" || screen === "garage");
+      touchLayer.classList.toggle("garageControls", screen === "garage");
+      touchLayer.classList.toggle("singleControls", screen === "garage" || (screen === "game" && game.activePlayers.length === 1));
       if (screen !== "game") hud.classList.remove("pickingMap");
       if (screen !== "game") touchLayer.classList.remove("pickingMap");
       if (screen !== "game") touchLayer.classList.remove("manualAim");
-      if (screen !== "game") touchLayer.classList.remove("singleControls");
       if (screen !== "game") game.airstrikeAim = null;
       centerMessage.classList.remove("active");
       goldenPrompt.classList.remove("active");
@@ -1992,6 +1957,7 @@
       const slot = accountTankSlot(account);
       settleTankSlot(account, slot);
       if (!tankSlotAvailable(slot)) {
+        game.garage.y = Math.max(game.garage.y, 235);
         showScreen("garage");
         return;
       }
@@ -2104,34 +2070,6 @@
       if (point.x < 150 && point.y > layout.upgradeDoorY - 45 && point.y < layout.upgradeDoorY + 190) return showScreen("upgrades");
     });
 
-    function setGarageStick(event) {
-      const box = garageMove.getBoundingClientRect();
-      const x = clamp((event.clientX - box.left - box.width / 2) / (box.width * .32), -1, 1);
-      const y = clamp((event.clientY - box.top - box.height / 2) / (box.height * .32), -1, 1);
-      const length = Math.max(1, Math.hypot(x, y));
-      game.garage.move = { x: x / length, y: y / length };
-      garageMove.style.setProperty("--stick-x", `${game.garage.move.x * box.width * .28}px`);
-      garageMove.style.setProperty("--stick-y", `${game.garage.move.y * box.height * .28}px`);
-    }
-
-    garageMove.addEventListener("pointerdown", (event) => {
-      game.garage.pointerId = event.pointerId;
-      garageMove.setPointerCapture(event.pointerId);
-      setGarageStick(event);
-    });
-    garageMove.addEventListener("pointermove", (event) => {
-      if (game.garage.pointerId === event.pointerId) setGarageStick(event);
-    });
-    const stopGarageStick = (event) => {
-      if (game.garage.pointerId !== event.pointerId) return;
-      game.garage.pointerId = null;
-      game.garage.move = { x: 0, y: 0 };
-      garageMove.style.setProperty("--stick-x", "0px");
-      garageMove.style.setProperty("--stick-y", "0px");
-    };
-    garageMove.addEventListener("pointerup", stopGarageStick);
-    garageMove.addEventListener("pointercancel", stopGarageStick);
-
     function updateGarage(dt) {
       if (!garageUi.classList.contains("active")) return;
       const account = garageAccount();
@@ -2141,13 +2079,23 @@
       const broken = game.garage.returnFromBattle && !tankSlotAvailable(slot);
       if (!tankSlotAvailable(slot) && !game.garage.returnFromBattle) return;
       const keyboard = keyboardControl(0).move;
-      const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : game.garage.move;
+      const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : input[0].move;
       const length = Math.max(1, Math.hypot(move.x, move.y));
       const tankClass = selectedTankClass(account);
-      const speed = broken ? 80 : Math.max(220, tankClass.speed * 2.4);
+      const speed = broken ? 105 : tankClass.speed + (account.upgrades.speed || 0) * 20;
       game.garage.x = clamp(game.garage.x + move.x / length * speed * dt, 135, layout.w - 135);
       game.garage.y = clamp(game.garage.y + move.y / length * speed * dt, 145, layout.h - 95);
       if (Math.hypot(move.x, move.y) > .08) game.garage.angle = lerpAngle(game.garage.angle, Math.atan2(move.y, move.x), 8 * dt);
+      game.garage.shotCooldown = Math.max(0, game.garage.shotCooldown - dt);
+      if (!broken && (input[0].firing || keys.has("Space")) && game.garage.shotCooldown <= 0) {
+        const angle = game.garage.angle;
+        const bulletSpeed = tankClass.bulletSpeed || (ORIGINAL_SHELL_SPEED + (account.upgrades.bulletSpeed || 0) * 55);
+        game.garage.shots.push({ x: game.garage.x + Math.cos(angle) * 42, y: game.garage.y + Math.sin(angle) * 42,
+          vx: Math.cos(angle) * bulletSpeed, vy: Math.sin(angle) * bulletSpeed, life: 1.25 });
+        game.garage.shotCooldown = tankClass.reloadTime || Math.max(.34, .58 - (account.upgrades.reload || 0) * .055 - tankClass.reloadBonus);
+      }
+      for (const shot of game.garage.shots) { shot.x += shot.vx * dt; shot.y += shot.vy * dt; shot.life -= dt; }
+      game.garage.shots = game.garage.shots.filter((shot) => shot.life > 0 && shot.x > 50 && shot.x < layout.w - 50 && shot.y > 50 && shot.y < layout.h - 50);
       if (game.garage.y < 190 && Math.abs(game.garage.x - layout.w / 2) < 115 && !broken) showArenaMenu();
       if (game.garage.x < 180 && game.garage.y > layout.tankDoorY + 20 && game.garage.y < layout.tankDoorY + 145) showScreen("tankBay");
       if (game.garage.x < 180 && game.garage.y > layout.upgradeDoorY + 20 && game.garage.y < layout.upgradeDoorY + 145) showScreen("upgrades");
@@ -2178,6 +2126,49 @@
       tank.turretAngle = angle;
       if (broken) tank.gunStyle = "broken";
       return tank;
+    }
+
+    function drawRoomDoor(x, y, w, h, label, open = false) {
+      const side = h > w;
+      ctx.save();
+      ctx.fillStyle = "rgba(16,35,45,.3)";
+      roundRect(x + 5, y + 7, w, h, 5); ctx.fill();
+      ctx.fillStyle = "#263b48";
+      roundRect(x, y, w, h, 5); ctx.fill();
+      ctx.strokeStyle = "#a3bac0"; ctx.lineWidth = 7;
+      ctx.strokeRect(x + 4, y + 4, w - 8, h - 8);
+      const ix = x + 15, iy = y + 15, iw = w - 30, ih = h - 30;
+      ctx.fillStyle = "#182c38"; ctx.fillRect(ix, iy, iw, ih);
+      const gap = open ? 28 : 3;
+      const leaves = side
+        ? [{ x: ix + 3, y: iy + 3, w: iw - 6, h: ih / 2 - gap }, { x: ix + 3, y: iy + ih / 2 + gap, w: iw - 6, h: ih / 2 - gap - 3 }]
+        : [{ x: ix + 3, y: iy + 3, w: iw / 2 - gap, h: ih - 6 }, { x: ix + iw / 2 + gap, y: iy + 3, w: iw / 2 - gap - 3, h: ih - 6 }];
+      for (const leaf of leaves) {
+        ctx.fillStyle = "#52707c"; ctx.fillRect(leaf.x, leaf.y, leaf.w, leaf.h);
+        ctx.strokeStyle = "#91b1bb"; ctx.lineWidth = 2;
+        ctx.strokeRect(leaf.x + 7, leaf.y + 7, leaf.w - 14, leaf.h - 14);
+        ctx.fillStyle = "#37505d";
+        if (side) ctx.fillRect(leaf.x + 11, leaf.y + 15, leaf.w - 22, 7);
+        else ctx.fillRect(leaf.x + 12, leaf.y + 13, leaf.w - 24, 7);
+      }
+      ctx.fillStyle = "#e9e3c7";
+      if (side) {
+        ctx.fillRect(x + w / 2 - 12, y + h / 2 - 24, 24, 5);
+        ctx.fillRect(x + w / 2 - 12, y + h / 2 + 19, 24, 5);
+      } else {
+        ctx.fillRect(x + w / 2 - 24, y + h / 2 - 10, 5, 20);
+        ctx.fillRect(x + w / 2 + 19, y + h / 2 - 10, 5, 20);
+      }
+      ctx.fillStyle = "#172f3b";
+      const signW = Math.min(w - 20, label.length * 12 + 30);
+      ctx.fillRect(x + (w - signW) / 2, y + 7, signW, 29);
+      ctx.fillStyle = "#fff7df"; ctx.textAlign = "center";
+      ctx.font = "900 17px system-ui";
+      ctx.fillText(label, x + w / 2, y + 28);
+      ctx.fillStyle = "#69d9e8";
+      if (side) ctx.fillRect(x + w - 8, y + 18, 5, h - 36);
+      else ctx.fillRect(x + 18, y + h - 8, w - 36, 5);
+      ctx.restore();
     }
 
     function drawGarage() {
@@ -2215,12 +2206,7 @@
       const doors = [{ x: layout.w / 2 - 125, y: 25, w: 250, h: 115, label: "ARENA" },
         { x: 25, y: layout.tankDoorY, w: 130, h: 170, label: "TANK" },
         { x: 25, y: layout.upgradeDoorY, w: 130, h: 170, label: "UPGRADE" }];
-      for (const door of doors) {
-        ctx.fillStyle = "#172432"; ctx.fillRect(door.x, door.y, door.w, door.h);
-        ctx.strokeStyle = "#69d9e8"; ctx.lineWidth = 8; ctx.strokeRect(door.x, door.y, door.w, door.h);
-        ctx.fillStyle = "#fff7df"; ctx.textAlign = "center"; ctx.font = door.label === "UPGRADE" ? "900 19px system-ui" : "900 26px system-ui";
-        ctx.fillText(door.label, door.x + door.w / 2, door.y + door.h / 2 + 9);
-      }
+      for (const door of doors) drawRoomDoor(door.x, door.y, door.w, door.h, door.label);
       const account = garageAccount();
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index];
@@ -2265,6 +2251,11 @@
         if (broken) drawBrokenExitTank(game.garage.x, game.garage.y, game.garage.angle);
         else drawTank(garageTank(account, activeSlot, game.garage.x, game.garage.y, game.garage.angle));
         ctx.restore();
+      }
+      for (const shot of game.garage.shots) {
+        ctx.strokeStyle = "#9fe8f5"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(shot.x - shot.vx * .018, shot.y - shot.vy * .018); ctx.lineTo(shot.x, shot.y); ctx.stroke();
+        ctx.fillStyle = "#fff1b8"; ctx.beginPath(); ctx.arc(shot.x, shot.y, 5, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
@@ -7961,22 +7952,7 @@
 
     function drawBattleDoor() {
       const door = game.entryDoor;
-      ctx.save();
-      ctx.translate(door.x, door.y);
-      ctx.fillStyle = "rgba(20,33,61,.25)";
-      roundRect(-73, -61, 146, 122, 8);
-      ctx.fill();
-      ctx.fillStyle = game.roundExit ? "#203b49" : "#39596a";
-      roundRect(-64, -54, 128, 108, 6);
-      ctx.fill();
-      ctx.strokeStyle = game.roundExit ? "#8de9ff" : "#83aeb5";
-      ctx.lineWidth = 7;
-      ctx.stroke();
-      ctx.fillStyle = "#fff7df";
-      ctx.font = "900 15px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText(game.roundExit ? "GARAGE" : "ENTRANCE", 0, 42);
-      ctx.restore();
+      drawRoomDoor(door.x - 73, door.y - 61, 146, 122, game.roundExit ? "GARAGE" : "ENTRY", !!game.roundExit);
     }
 
     function drawBrokenExitTank(x, y, angle) {
@@ -10974,7 +10950,7 @@
     syncShopAccount();
     renderAccounts();
     renderMultiplayerMenu();
-    renderGarage();
+    showScreen("garage");
     requestAnimationFrame(loop);
   </script>
 </body>
