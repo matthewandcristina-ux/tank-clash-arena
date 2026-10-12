@@ -6393,6 +6393,7 @@
     }
 
     function rocketPodTargets(tank, targetMode = "near") {
+      if (tank.garageWorld) return [];
       const targets = game.tanks
         .filter((other) => other.alive && other.id !== tank.id && !sameTeam(other.team, tank.team))
         .filter((other) => Math.hypot(other.x - tank.x, other.y - tank.y) < 1120)
@@ -6851,6 +6852,7 @@
     }
 
     function laserTankBlocker(tank, sx, sy, ex, ey) {
+      if (tank.garageWorld) return null;
       let closest = null;
       for (const other of game.tanks) {
         if (!other.alive || other.buried || other.id === tank.id || sameTeam(other.team, tank.team)) continue;
