@@ -1850,7 +1850,7 @@
       nextModeAfterMessage: null,
       blueRoom: null,
       roundExit: null,
-      garage: { x: 640, y: 520, angle: -Math.PI / 2, selectedPad: 0, accountId: null, returnFromBattle: false, panelExpanded: false, bullets: [], tank: null, camera: null, lookAt: null, drag: null },
+      garage: { x: 640, y: 520, angle: -Math.PI / 2, selectedPad: 0, accountId: null, returnFromBattle: false, panelExpanded: false, bullets: [], tank: null, camera: null, lookAt: null, drag: null, returnDoor: null },
       soundEnabled: loadSoundEnabled()
     };
 
@@ -1897,10 +1897,12 @@
     resize();
 
     function showScreen(screen) {
-      if (screen === "garage" && (tankBayMenu.classList.contains("active") || upgradeMenu.classList.contains("active") || settingsMenu.classList.contains("active"))) {
-        game.garage.x = Math.max(game.garage.x, 230);
-      }
-      if (screen === "garage" && mainMenu.classList.contains("active")) game.garage.y = Math.max(game.garage.y, 235);
+      const returningFromTankRoom = screen === "garage" && tankBayMenu.classList.contains("active");
+      const returningFromUpgradeRoom = screen === "garage" && upgradeMenu.classList.contains("active");
+      const returningFromArenaMenu = screen === "garage" && mainMenu.classList.contains("active");
+      if (returningFromTankRoom) placeGarageTankAtDoor("tank");
+      else if (returningFromUpgradeRoom) placeGarageTankAtDoor("upgrade");
+      else if (returningFromArenaMenu && game.garage.returnDoor === "arena") placeGarageTankAtDoor("arena");
       garageUi.classList.toggle("active", screen === "garage");
       settingsMenu.classList.toggle("active", screen === "settings");
       mainMenu.classList.toggle("active", screen === "main");
@@ -1967,10 +1969,34 @@
         w: 3400,
         h: 920,
         pads: [{ x: 640, y: 500 }, { x: 1700, y: 500 }, { x: 2760, y: 500 }],
-        arenaDoor: { x: 1625, y: -24, w: 150, h: 164, label: "ARENA" },
-        tankDoor: { x: -24, y: 260, w: 166, h: 182, label: "TANK" },
-        upgradeDoor: { x: -24, y: 550, w: 166, h: 182, label: "UPGRADE" }
+        arenaDoor: { x: 1625, y: -24, w: 150, h: 164, label: "ARENA", side: "top" },
+        tankDoor: { x: -36, y: 275, w: 132, h: 176, label: "TANK", side: "left" },
+        upgradeDoor: { x: -36, y: 555, w: 132, h: 176, label: "UPGRADE", side: "left" }
       };
+    }
+
+    function garageDoorSpawn(kind) {
+      const layout = garageLayout();
+      if (kind === "tank") return { x: layout.tankDoor.x + layout.tankDoor.w + 62, y: layout.tankDoor.y + layout.tankDoor.h / 2, angle: 0 };
+      if (kind === "upgrade") return { x: layout.upgradeDoor.x + layout.upgradeDoor.w + 62, y: layout.upgradeDoor.y + layout.upgradeDoor.h / 2, angle: 0 };
+      return { x: layout.arenaDoor.x + layout.arenaDoor.w / 2, y: layout.arenaDoor.y + layout.arenaDoor.h + 62, angle: Math.PI / 2 };
+    }
+
+    function placeGarageTankAtDoor(kind) {
+      const spawn = garageDoorSpawn(kind);
+      game.garage.x = spawn.x;
+      game.garage.y = spawn.y;
+      game.garage.angle = spawn.angle;
+      game.garage.tank = null;
+      game.garage.lookAt = null;
+      game.garage.camera = null;
+      game.garage.returnDoor = null;
+    }
+
+    function enterGarageRoom(kind) {
+      game.garage.returnDoor = kind;
+      input.forEach((playerInput) => playerInput.firing = false);
+      showScreen(kind === "tank" ? "tankBay" : kind === "upgrade" ? "upgrades" : "main");
     }
 
     function garageAccount() {
@@ -2099,9 +2125,9 @@
       }
       const pad = layout.pads.findIndex((position) => Math.hypot(position.x - point.x, position.y - point.y) < 150);
       if (pad >= 0) return selectGaragePad(pad);
-      if (point.y < 150 && Math.abs(point.x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 115) return showArenaMenu();
-      if (point.x < 170 && point.y > layout.tankDoor.y - 35 && point.y < layout.tankDoor.y + layout.tankDoor.h + 35) return showScreen("tankBay");
-      if (point.x < 170 && point.y > layout.upgradeDoor.y - 35 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 35) return showScreen("upgrades");
+      if (point.y < 150 && Math.abs(point.x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 115) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
+      if (point.x < 150 && point.y > layout.tankDoor.y - 24 && point.y < layout.tankDoor.y + layout.tankDoor.h + 24) return enterGarageRoom("tank");
+      if (point.x < 150 && point.y > layout.upgradeDoor.y - 24 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 24) return enterGarageRoom("upgrade");
       const focus = game.garage.lookAt || game.garage.tank || { x: game.garage.x, y: game.garage.y };
       game.garage.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, focusX: focus.x, focusY: focus.y };
       canvas.setPointerCapture(event.pointerId);
@@ -2181,22 +2207,6 @@
       return tank;
     }
 
-    function moveGarageTank(tank, move, dt, layout) {
-      const length = Math.hypot(move.x, move.y);
-      const x = length > 1 ? move.x / length : move.x;
-      const y = length > 1 ? move.y / length : move.y;
-      tank.vx = x * tank.speed;
-      tank.vy = y * tank.speed;
-      if (length > .05) {
-        tank.bodyAngle = lerpAngle(tank.bodyAngle, Math.atan2(y, x), tank.turnSpeed * dt);
-        game.garage.lookAt = null;
-      }
-      tank.trackOffset = (tank.trackOffset + Math.hypot(tank.vx, tank.vy) * dt * .24) % 16;
-      tank.x = clamp(tank.x + tank.vx * dt, tank.r + 64, layout.w - tank.r - 64);
-      tank.y = clamp(tank.y + tank.vy * dt, tank.r + 64, layout.h - tank.r - 64);
-      game.garage.x = tank.x; game.garage.y = tank.y; game.garage.angle = tank.bodyAngle;
-    }
-
     function updateGarageBullets(dt, layout) {
       for (const bullet of game.garage.bullets) {
         bullet.x += bullet.vx * dt;
@@ -2216,7 +2226,6 @@
       if (!tankSlotAvailable(slot) && !game.garage.returnFromBattle) return;
       const keyboard = keyboardControl(0);
       const move = Math.hypot(keyboard.move.x, keyboard.move.y) > .05 ? keyboard.move : input[0].move;
-      const aim = Math.hypot(keyboard.aim.x, keyboard.aim.y) > .05 ? keyboard.aim : input[0].aim;
       const tank = syncGarageTank(account, slot);
       if (broken) {
         const length = Math.hypot(move.x, move.y) || 1;
@@ -2227,27 +2236,26 @@
         tank.reload = Math.max(0, tank.reload - dt);
         tank.rocketReload = Math.max(0, tank.rocketReload - dt);
         tank.launcherReload = Math.max(0, tank.launcherReload - dt);
+        tank.mineReload = Math.max(0, tank.mineReload - dt);
+        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
         tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
         tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
+        updateHumanTank(tank, dt);
         updateRocketPods(dt, [tank]);
-        moveGarageTank(tank, move, dt, layout);
-        if (Math.hypot(aim.x, aim.y) > .15) tank.turretAngle = Math.atan2(aim.y, aim.x);
-        else if (Math.hypot(move.x, move.y) > .15) tank.turretAngle = tank.bodyAngle;
-        const firing = input[0].firing || keyboard.fire;
-        if (tank.laserGun) {
-          updateLaserCharge(tank, firing, dt);
-          if (firing) fireUpgradeRocket(tank);
-        } else if (firing) {
-          fire(tank);
-        }
         updateLasers(dt, [tank]);
+        updateRepairDrone(tank, dt);
+        updateTankDamageEffects(tank, dt);
+        game.garage.x = tank.x; game.garage.y = tank.y; game.garage.angle = tank.bodyAngle;
+        if (Math.hypot(move.x, move.y) > .05) game.garage.lookAt = null;
       }
       updateGarageBullets(dt, layout);
+      updateParticles(dt);
+      updateTrackMarks(dt);
       const x = broken ? game.garage.x : tank.x;
       const y = broken ? game.garage.y : tank.y;
-      if (y < 155 && Math.abs(x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 108 && !broken) return showArenaMenu();
-      if (x < 165 && y > layout.tankDoor.y - 20 && y < layout.tankDoor.y + layout.tankDoor.h + 20) return showScreen("tankBay");
-      if (x < 165 && y > layout.upgradeDoor.y - 20 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 20) return showScreen("upgrades");
+      if (y < 155 && Math.abs(x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 108 && !broken) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
+      if (x < 138 && y > layout.tankDoor.y - 16 && y < layout.tankDoor.y + layout.tankDoor.h + 16) return enterGarageRoom("tank");
+      if (x < 138 && y > layout.upgradeDoor.y - 16 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 16) return enterGarageRoom("upgrade");
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index];
         if (broken && account.activeTankSlot === index && Math.hypot(x - pad.x, y - pad.y) < 94) {
@@ -2269,7 +2277,15 @@
       return tank;
     }
 
-    function drawRoomDoor(x, y, w, h, label, open = false) {
+    function drawRoomDoor(x, y, w, h, label, open = false, side = "top") {
+      if (side === "left") {
+        ctx.save();
+        ctx.translate(x + w / 2, y + h / 2);
+        ctx.rotate(Math.PI / 2);
+        drawRoomDoor(-h / 2, -w / 2, h, w, label, open, "top");
+        ctx.restore();
+        return;
+      }
       const r = Math.min(w * .42, h * .31);
       const outerPath = (inset = 0) => {
         const left = x + inset, right = x + w - inset, top = y + inset, bottom = y + h;
@@ -2299,6 +2315,49 @@
       roundRect(x + w / 2 - Math.min(w - 18, label.length * 11 + 28) / 2, y + 3, Math.min(w - 18, label.length * 11 + 28), 27, 4); ctx.fill();
       ctx.fillStyle = "#fff7df"; ctx.font = "900 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, x + w / 2, y + 22);
       ctx.restore();
+    }
+
+    function drawGarageRepairRig(x, y) {
+      const arms = [-1, 1];
+      for (const side of arms) {
+        const baseX = x + side * 102;
+        const elbowX = x + side * 68;
+        const toolX = x + side * 31;
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#8d99a6";
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(baseX, y - 72);
+        ctx.lineTo(elbowX, y - 34);
+        ctx.lineTo(toolX, y - 18);
+        ctx.stroke();
+        ctx.strokeStyle = "#405361";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(baseX, y - 72);
+        ctx.lineTo(elbowX, y - 34);
+        ctx.lineTo(toolX, y - 18);
+        ctx.stroke();
+        for (const [jointX, jointY] of [[baseX, y - 72], [elbowX, y - 34]]) {
+          ctx.fillStyle = "#213846";
+          ctx.beginPath(); ctx.arc(jointX, jointY, 10, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#69e7ff";
+          ctx.beginPath(); ctx.arc(jointX, jointY, 4, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.strokeStyle = "#69e7ff";
+        ctx.lineWidth = 4;
+        ctx.shadowColor = "#69e7ff";
+        ctx.shadowBlur = 13;
+        ctx.beginPath();
+        ctx.moveTo(toolX, y - 18);
+        ctx.lineTo(x + side * 22, y - 8);
+        ctx.lineTo(x + side * 29, y + 1);
+        ctx.lineTo(x + side * 18, y + 10);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     function drawGarageWallBlock(x, y, w, h) {
@@ -2350,9 +2409,10 @@
         ctx.strokeStyle = "#173b4d"; ctx.lineWidth = 4; ctx.stroke();
         ctx.restore();
       }
-      drawRoomDoor(layout.arenaDoor.x, layout.arenaDoor.y, layout.arenaDoor.w, layout.arenaDoor.h, layout.arenaDoor.label);
-      drawRoomDoor(layout.tankDoor.x, layout.tankDoor.y, layout.tankDoor.w, layout.tankDoor.h, layout.tankDoor.label);
-      drawRoomDoor(layout.upgradeDoor.x, layout.upgradeDoor.y, layout.upgradeDoor.w, layout.upgradeDoor.h, layout.upgradeDoor.label);
+      drawRoomDoor(layout.arenaDoor.x, layout.arenaDoor.y, layout.arenaDoor.w, layout.arenaDoor.h, layout.arenaDoor.label, false, layout.arenaDoor.side);
+      drawRoomDoor(layout.tankDoor.x, layout.tankDoor.y, layout.tankDoor.w, layout.tankDoor.h, layout.tankDoor.label, false, layout.tankDoor.side);
+      drawRoomDoor(layout.upgradeDoor.x, layout.upgradeDoor.y, layout.upgradeDoor.w, layout.upgradeDoor.h, layout.upgradeDoor.label, false, layout.upgradeDoor.side);
+      drawTrackMarks();
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index], slot = account.tankSlots[index];
         const selected = account.activeTankSlot === index, broken = slot.repairPending || slot.wreckedUntil > Date.now();
@@ -2363,7 +2423,10 @@
         ctx.fillStyle = "#fff7df"; ctx.textAlign = "center"; ctx.font = "900 22px system-ui"; ctx.fillText(`TANK ${index + 1}`, pad.x, pad.y + 112);
         if (slot.tankOwned && !arrivingWreck && (index !== account.activeTankSlot || !tankSlotAvailable(slot) || training)) {
           const bounce = training ? Math.sin(performance.now() * .012) * 9 : 0;
-          if (broken) drawBrokenExitTank(pad.x, pad.y - 10 + bounce, -Math.PI / 2);
+          if (broken) {
+            drawBrokenExitTank(pad.x, pad.y - 10 + bounce, -Math.PI / 2);
+            if (!slot.repairPending && slot.wreckedUntil > Date.now()) drawGarageRepairRig(pad.x, pad.y - 10);
+          }
           else drawTank(garageTank(account, slot, pad.x, pad.y - 10 + bounce, -Math.PI / 2));
         } else if (!slot.tankOwned) { ctx.fillStyle = "#c1d0cf"; ctx.font = "900 56px system-ui"; ctx.fillText("+", pad.x, pad.y + 5); }
         if (training) { ctx.fillStyle = "#ef476f"; ctx.fillRect(pad.x - 42, pad.y + 55, 84, 8); }
@@ -2375,6 +2438,7 @@
       }
       for (const bullet of game.garage.bullets) drawBullet(bullet);
       drawTankLasers(game.garage.tank ? [game.garage.tank] : []);
+      drawParticles();
       ctx.restore();
     }
 
@@ -2518,10 +2582,24 @@
       if (action === "captureBots") requestStartGame("captureBots");
       if (action === "team") requestStartGame("team");
       if (action === "garage") showMainMenu();
-      if (action === "backMain") {
-        if (multiMenu.classList.contains("active") || promoMenu.classList.contains("active") || tradeMenu.classList.contains("active")) showArenaMenu();
-        else showMainMenu();
+      if (action === "backMain") navigateBack();
+    });
+
+    function navigateBack() {
+      input.forEach((playerInput) => playerInput.firing = false);
+      if (multiMenu.classList.contains("active") || promoMenu.classList.contains("active") || tradeMenu.classList.contains("active")) {
+        showArenaMenu();
+        return;
       }
+      showMainMenu();
+    }
+
+    document.querySelectorAll('[data-action="backMain"]').forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        navigateBack();
+      });
     });
 
     document.body.addEventListener("click", (e) => {
@@ -5405,14 +5483,14 @@
       const pad = input[tank.playerIndex];
       const keyboard = keyboardControl(tank.playerIndex);
       const move = Math.hypot(keyboard.move.x, keyboard.move.y) > 0 ? keyboard.move : pad.move;
-      if (game.mode === "siege" && game.siege && game.siege.time < 1.25) {
+      if (!tank.garageWorld && game.mode === "siege" && game.siege && game.siege.time < 1.25) {
         tank.vx = 0;
         tank.vy = 0;
         return;
       }
-      const autoFire = usesMultiplayerAutoFire(game.mode);
+      const autoFire = !tank.garageWorld && usesMultiplayerAutoFire(game.mode);
       // PvP matches fire automatically, but the second stick must still steer the turret.
-      const manualAim = isManualAimMode(game.mode);
+      const manualAim = tank.garageWorld || isManualAimMode(game.mode);
       const aim = manualAim
         ? (Math.hypot(keyboard.aim.x, keyboard.aim.y) > 0 ? keyboard.aim : pad.aim)
         : autoAimVector(tank, move);
@@ -5427,7 +5505,7 @@
         const laserHeld = pad.firing || keyboard.fire || autoLaser;
         updateLaserCharge(tank, laserHeld, dt);
         if (laserHeld) fireUpgradeRocket(tank);
-      } else if (autoFire || manualAim || pad.firing || keyboard.fire) {
+      } else if (autoFire || (!tank.garageWorld && manualAim) || pad.firing || keyboard.fire) {
         fire(tank);
       }
     }
@@ -5788,8 +5866,9 @@
     }
 
     function moveTank(tank, x, y, dt) {
-      const wreckSlow = tank.waterGlide ? 1 : wreckSlowAt(tank.x, tank.y, tank.r);
-      const terrainSlow = tank.waterGlide ? 1 : terrainSlowAt(tank.x, tank.y, tank.r);
+      const garageWorld = !!tank.garageWorld;
+      const wreckSlow = garageWorld || tank.waterGlide ? 1 : wreckSlowAt(tank.x, tank.y, tank.r);
+      const terrainSlow = garageWorld || tank.waterGlide ? 1 : terrainSlowAt(tank.x, tank.y, tank.r);
       const speed = tank.speed * (tank.hp < tank.maxHp * .35 ? .78 : 1) * wreckSlow * terrainSlow;
       tank.vx = x * speed;
       tank.vy = y * speed;
@@ -5802,17 +5881,19 @@
       const oldX = tank.x;
       const oldY = tank.y;
       tank.x += tank.vx * dt;
-      if (game.mode === "single" && game.level === 7 && tank.controller === "ai" && tank.x < WORLD.w / 2 + 150) tank.x = oldX;
-      if (collidesTank(tank)) tank.x = oldX;
+      if (!garageWorld && game.mode === "single" && game.level === 7 && tank.controller === "ai" && tank.x < WORLD.w / 2 + 150) tank.x = oldX;
+      if (!garageWorld && collidesTank(tank)) tank.x = oldX;
       tank.y += tank.vy * dt;
-      if (collidesTank(tank)) tank.y = oldY;
-      tank.x = clamp(tank.x, tank.r + 44, WORLD.w - tank.r - 44);
-      tank.y = clamp(tank.y, tank.r + 44, WORLD.h - tank.r - 44);
-      if (!siegeRampRoadAllows(tank.x, tank.y)) {
+      if (!garageWorld && collidesTank(tank)) tank.y = oldY;
+      const bounds = garageWorld ? garageLayout() : WORLD;
+      const edge = garageWorld ? 64 : 44;
+      tank.x = clamp(tank.x, tank.r + edge, bounds.w - tank.r - edge);
+      tank.y = clamp(tank.y, tank.r + edge, bounds.h - tank.r - edge);
+      if (!garageWorld && !siegeRampRoadAllows(tank.x, tank.y)) {
         tank.x = startX;
         tank.y = startY;
       }
-      if (blockedRaisedEntry(tank, startX, startY) || blockedRaisedExit(tank, startX, startY)) {
+      if (!garageWorld && (blockedRaisedEntry(tank, startX, startY) || blockedRaisedExit(tank, startX, startY))) {
         tank.x = startX;
         tank.y = startY;
       }
@@ -7811,18 +7892,26 @@
       const exit = game.roundExit;
       exit.time += dt;
       for (const tank of game.tanks) {
-        const keyboard = keyboardControl(tank.playerIndex).move;
-        const pad = input[tank.playerIndex];
-        const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : pad.move;
-        const originalSpeed = tank.speed;
-        if (!tank.alive) tank.speed = 105;
-        moveTank(tank, move.x, move.y, dt);
-        tank.speed = originalSpeed;
+        if (tank.alive) {
+          tank.reload = Math.max(0, tank.reload - dt);
+          tank.rocketReload = Math.max(0, tank.rocketReload - dt);
+          tank.launcherReload = Math.max(0, tank.launcherReload - dt);
+          tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
+          tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
+          updateHumanTank(tank, dt);
+          updateRepairDrone(tank, dt);
+          updateTankDamageEffects(tank, dt);
+        } else {
+          const keyboard = keyboardControl(tank.playerIndex).move;
+          const pad = input[tank.playerIndex];
+          const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : pad.move;
+          const originalSpeed = tank.speed;
+          tank.speed = 105;
+          moveTank(tank, move.x, move.y, dt);
+          tank.speed = originalSpeed;
+        }
         if (exit.time > 1.5 && Math.hypot(tank.x - exit.door.x, tank.y - exit.door.y) < 68) {
-          game.garage.x = 640;
-          game.garage.y = 520;
-          game.garage.angle = Math.PI / 2;
-          game.garage.tank = null;
+          placeGarageTankAtDoor("arena");
           game.garage.bullets = [];
           game.garage.selectedPad = tank.tankSlotIndex;
           game.garage.accountId = tank.accountId;
@@ -7834,6 +7923,9 @@
           return;
         }
       }
+      updateRocketPods(dt);
+      updateLasers(dt);
+      updateBullets(dt);
       updateParticles(dt);
       updateTrackMarks(dt);
     }
@@ -8090,7 +8182,7 @@
 
     function drawBattleDoor() {
       const door = game.entryDoor;
-      drawRoomDoor(door.x - 66, door.y - 78, 132, 158, game.roundExit ? "GARAGE" : "ENTRY", !!game.roundExit);
+      drawRoomDoor(door.x - 66, door.y - 78, 132, 158, game.roundExit ? "GARAGE" : "ENTRY", !!game.roundExit, door.side || "top");
     }
 
     function drawBrokenExitTank(x, y, angle) {
