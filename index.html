@@ -1918,7 +1918,7 @@
       hud.classList.toggle("active", screen === "game");
       touchLayer.classList.toggle("active", screen === "game" || screen === "garage");
       touchLayer.classList.toggle("garageControls", screen === "garage");
-      touchLayer.classList.toggle("singleControls", screen === "garage" || (screen === "game" && game.activePlayers.length === 1));
+      touchLayer.classList.toggle("singleControls", screen === "garage" || (screen === "game" && (game.mode === "single" || game.mode === "siege" || game.mode === "blueRoom")));
       if (screen !== "game") hud.classList.remove("pickingMap");
       if (screen !== "game") touchLayer.classList.remove("pickingMap");
       if (screen !== "game") touchLayer.classList.remove("manualAim");
