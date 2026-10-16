@@ -143,6 +143,126 @@
       font-weight: 800;
     }
 
+    .mysteryPanel {
+      width: min(92vw, 520px);
+      overflow: hidden;
+      background: linear-gradient(180deg, #172b3b, #101a29);
+      color: #f6fcff;
+    }
+
+    .mysteryPanel .brand,
+    .mysteryPanel .tagline { color: #f6fcff; text-shadow: none; }
+
+    .mysteryStage {
+      position: relative;
+      width: min(310px, 76vw);
+      height: 245px;
+      margin: 18px auto 10px;
+      perspective: 700px;
+    }
+
+    .mysteryGlow {
+      position: absolute;
+      left: 50%;
+      top: 54%;
+      width: 210px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(105,231,255,.5), rgba(105,231,255,0) 68%);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(.4);
+      transition: opacity .35s .45s, transform .55s .38s;
+    }
+
+    .mysteryChest {
+      position: absolute;
+      left: 50%;
+      bottom: 22px;
+      width: 190px;
+      height: 110px;
+      transform: translateX(-50%);
+    }
+
+    .mysteryChestBase,
+    .mysteryChestLid {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      border: 7px solid #14213d;
+      background: #456990;
+      box-shadow: inset 0 0 0 6px #6e98ad, 0 10px 0 rgba(0,0,0,.18);
+    }
+
+    .mysteryChestBase { bottom: 0; height: 76px; border-radius: 7px; }
+    .mysteryChestLid {
+      top: 0;
+      height: 51px;
+      border-radius: 18px 18px 5px 5px;
+      transform-origin: 50% 100%;
+      transition: transform .62s cubic-bezier(.2,.75,.2,1);
+    }
+
+    .mysteryQuestion {
+      position: absolute;
+      inset: 29px auto auto 50%;
+      width: 58px;
+      height: 58px;
+      border: 5px solid #14213d;
+      border-radius: 50%;
+      background: #ffd166;
+      color: #14213d;
+      font-size: 2.4rem;
+      font-weight: 950;
+      line-height: 48px;
+      transform: translateX(-50%);
+      z-index: 2;
+      transition: opacity .2s .18s, transform .35s;
+    }
+
+    .mysteryTracks {
+      position: absolute;
+      left: 50%;
+      top: 66px;
+      width: 172px;
+      height: 98px;
+      opacity: 0;
+      transform: translate(-50%, 34px) scale(.45);
+      transition: opacity .32s .45s, transform .64s .38s cubic-bezier(.16,.8,.2,1.18);
+    }
+
+    .mysteryTrack {
+      position: absolute;
+      top: 5px;
+      width: 32px;
+      height: 88px;
+      border: 6px solid #0a1522;
+      border-radius: 13px;
+      background: repeating-linear-gradient(0deg, #a9bfcb 0 8px, #354b60 8px 15px);
+      box-shadow: 0 0 0 4px #69e7ff55;
+    }
+
+    .mysteryTrack.left { left: 12px; transform: rotate(-7deg); }
+    .mysteryTrack.right { right: 12px; transform: rotate(7deg); }
+    .mysteryLightning {
+      position: absolute;
+      left: 48px;
+      top: 34px;
+      width: 76px;
+      height: 30px;
+      border-top: 7px solid #c9fbff;
+      border-bottom: 5px solid #69e7ff;
+      clip-path: polygon(0 38%,18% 0,33% 61%,50% 15%,66% 72%,83% 26%,100% 55%,100% 82%,82% 55%,67% 100%,50% 47%,34% 91%,17% 33%,0 70%);
+      filter: drop-shadow(0 0 7px #69e7ff);
+      animation: mysteryZap .18s steps(2) infinite;
+    }
+
+    .mysteryPanel.opened .mysteryChestLid { transform: translateY(-38px) rotateX(-118deg); }
+    .mysteryPanel.opened .mysteryQuestion { opacity: 0; transform: translateX(-50%) scale(.2); }
+    .mysteryPanel.opened .mysteryTracks { opacity: 1; transform: translate(-50%, -5px) scale(1); }
+    .mysteryPanel.opened .mysteryGlow { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    @keyframes mysteryZap { 50% { transform: scaleY(.72) translateY(3px); opacity: .7; } }
+
     .tagline {
       margin: 12px auto 0;
       max-width: 46ch;
@@ -845,6 +965,12 @@
       bottom: max(18px, env(safe-area-inset-bottom));
     }
 
+    #touchLayer.singleControls .controlZone.p1 .phaseButton {
+      position: fixed;
+      right: calc(max(18px, env(safe-area-inset-right)) + 88px);
+      bottom: max(18px, env(safe-area-inset-bottom));
+    }
+
     #touchLayer.singleControls .controlZone.p1 .targetButton,
     #touchLayer.singleControls .controlZone.p1 .mineButton,
     #touchLayer.singleControls .controlZone.p1 .airstrikeButton,
@@ -1005,7 +1131,8 @@
     .mineButton,
     .launcherButton,
     .goldenButton,
-    .barricadeButton {
+    .barricadeButton,
+    .phaseButton {
       width: 76px;
       height: 30px;
       border: 3px solid rgba(20, 33, 61, .75);
@@ -1040,11 +1167,28 @@
       color: white;
     }
 
+    .phaseButton {
+      width: 76px;
+      height: 76px;
+      grid-column: 1;
+      grid-row: 5;
+      background: rgba(22, 139, 181, .94);
+      color: white;
+      box-shadow: 0 5px 0 rgba(20, 33, 61, .24), inset 0 0 0 4px rgba(105,231,255,.16);
+    }
+
+    .phaseButton.active {
+      background: #69e7ff;
+      color: #14213d;
+      box-shadow: 0 5px 0 rgba(20, 33, 61, .24), 0 0 0 5px rgba(105,231,255,.27), 0 0 22px #69e7ff;
+    }
+
     .airstrikeButton.hidden,
     .mineButton.hidden,
     .launcherButton.hidden,
     .goldenButton.hidden,
-    .barricadeButton.hidden {
+    .barricadeButton.hidden,
+    .phaseButton.hidden {
       display: none;
     }
 
@@ -1082,7 +1226,8 @@
     #touchLayer:not(.singleControls) .mineButton,
     #touchLayer:not(.singleControls) .launcherButton,
     #touchLayer:not(.singleControls) .goldenButton,
-    #touchLayer:not(.singleControls) .barricadeButton {
+    #touchLayer:not(.singleControls) .barricadeButton,
+    #touchLayer:not(.singleControls) .phaseButton {
       width: 86px;
       height: 38px;
       font-size: .58rem;
@@ -1376,7 +1521,7 @@
 
   <div id="mainMenu" class="screen">
     <section class="menuPanel">
-      <h1 class="brand">Tank <span id="tradeLetter" class="promoLetter" role="button" tabindex="0" aria-label="Open trade shop">C</span>lash <span id="promoLetter" class="promoLetter" role="button" tabindex="0" aria-label="Secret promo code">A</span>rena</h1>
+      <h1 class="brand">Tank <span id="tradeLetter" class="promoLetter" role="button" tabindex="0" aria-label="Open trade shop">C</span>las<span id="mysteryLetter" class="promoLetter" role="button" tabindex="0" aria-label="Open mystery box">h</span> <span id="promoLetter" class="promoLetter" role="button" tabindex="0" aria-label="Secret promo code">A</span>rena</h1>
       <p class="tagline">Choose a battle.</p>
       <div class="menuButtons">
         <button class="bigButton" data-action="single">Single Player</button>
@@ -1413,6 +1558,29 @@
         <button id="tradeSteelToGolden" class="bigButton" type="button"></button>
       </div>
       <p id="tradeResult" class="promoResult" aria-live="polite"></p>
+      <button class="smallButton alt" type="button" data-action="backMain">Back</button>
+    </section>
+  </div>
+
+  <div id="mysteryMenu" class="screen">
+    <section id="mysteryPanel" class="menuPanel mysteryPanel">
+      <h1 class="brand">Mystery Box</h1>
+      <p id="mysteryBalance" class="tagline"></p>
+      <div class="mysteryStage" aria-label="Mystery box containing electric tracks">
+        <div class="mysteryGlow"></div>
+        <div class="mysteryChest">
+          <div class="mysteryChestBase"></div>
+          <div class="mysteryChestLid"></div>
+          <div class="mysteryQuestion">?</div>
+        </div>
+        <div class="mysteryTracks" aria-hidden="true">
+          <i class="mysteryTrack left"></i>
+          <i class="mysteryLightning"></i>
+          <i class="mysteryTrack right"></i>
+        </div>
+      </div>
+      <button id="mysteryBuyButton" class="bigButton" type="button">Open: 1,200 Steel Bucks + 1 Golden Bullet</button>
+      <p id="mysteryResult" class="promoResult" aria-live="polite"></p>
       <button class="smallButton alt" type="button" data-action="backMain">Back</button>
     </section>
   </div>
@@ -1635,6 +1803,7 @@
       <button class="launcherButton hidden" type="button">Launch 6</button>
       <button class="goldenButton hidden" type="button">Golden</button>
       <button class="barricadeButton hidden" type="button">Cover</button>
+      <button class="phaseButton hidden" type="button">Split</button>
       <div class="fire" data-label="Fire"></div>
     </div>
     <div class="controlZone p2 hidden" data-player="1">
@@ -1646,6 +1815,7 @@
       <button class="launcherButton hidden" type="button">Launch 6</button>
       <button class="goldenButton hidden" type="button">Golden</button>
       <button class="barricadeButton hidden" type="button">Cover</button>
+      <button class="phaseButton hidden" type="button">Split</button>
       <div class="fire" data-label="Fire"></div>
     </div>
     <div class="controlZone p3 hidden" data-player="2">
@@ -1657,6 +1827,7 @@
       <button class="launcherButton hidden" type="button">Launch 6</button>
       <button class="goldenButton hidden" type="button">Golden</button>
       <button class="barricadeButton hidden" type="button">Cover</button>
+      <button class="phaseButton hidden" type="button">Split</button>
       <div class="fire" data-label="Fire"></div>
     </div>
     <div class="controlZone p4 hidden" data-player="3">
@@ -1668,6 +1839,7 @@
       <button class="launcherButton hidden" type="button">Launch 6</button>
       <button class="goldenButton hidden" type="button">Golden</button>
       <button class="barricadeButton hidden" type="button">Cover</button>
+      <button class="phaseButton hidden" type="button">Split</button>
       <div class="fire" data-label="Fire"></div>
     </div>
   </div>
@@ -1970,15 +2142,15 @@
         h: 920,
         pads: [{ x: 640, y: 500 }, { x: 1700, y: 500 }, { x: 2760, y: 500 }],
         arenaDoor: { x: 1625, y: -24, w: 150, h: 164, label: "ARENA", side: "top" },
-        tankDoor: { x: -36, y: 275, w: 132, h: 176, label: "TANK", side: "left" },
-        upgradeDoor: { x: -36, y: 555, w: 132, h: 176, label: "UPGRADE", side: "left" }
+        tankDoor: { x: -20, y: 182, w: 205, h: 248, label: "TANK", side: "left" },
+        upgradeDoor: { x: -20, y: 510, w: 205, h: 248, label: "UPGRADE", side: "left" }
       };
     }
 
     function garageDoorSpawn(kind) {
       const layout = garageLayout();
-      if (kind === "tank") return { x: layout.tankDoor.x + layout.tankDoor.w + 62, y: layout.tankDoor.y + layout.tankDoor.h / 2, angle: 0 };
-      if (kind === "upgrade") return { x: layout.upgradeDoor.x + layout.upgradeDoor.w + 62, y: layout.upgradeDoor.y + layout.upgradeDoor.h / 2, angle: 0 };
+      if (kind === "tank") return { x: layout.tankDoor.x + layout.tankDoor.w + 92, y: layout.tankDoor.y + layout.tankDoor.h / 2, angle: 0 };
+      if (kind === "upgrade") return { x: layout.upgradeDoor.x + layout.upgradeDoor.w + 92, y: layout.upgradeDoor.y + layout.upgradeDoor.h / 2, angle: 0 };
       return { x: layout.arenaDoor.x + layout.arenaDoor.w / 2, y: layout.arenaDoor.y + layout.arenaDoor.h + 62, angle: Math.PI / 2 };
     }
 
@@ -2126,8 +2298,8 @@
       const pad = layout.pads.findIndex((position) => Math.hypot(position.x - point.x, position.y - point.y) < 150);
       if (pad >= 0) return selectGaragePad(pad);
       if (point.y < 150 && Math.abs(point.x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 115) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
-      if (point.x < 150 && point.y > layout.tankDoor.y - 24 && point.y < layout.tankDoor.y + layout.tankDoor.h + 24) return enterGarageRoom("tank");
-      if (point.x < 150 && point.y > layout.upgradeDoor.y - 24 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 24) return enterGarageRoom("upgrade");
+      if (point.x < 205 && point.y > layout.tankDoor.y - 18 && point.y < layout.tankDoor.y + layout.tankDoor.h + 18) return enterGarageRoom("tank");
+      if (point.x < 205 && point.y > layout.upgradeDoor.y - 18 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 18) return enterGarageRoom("upgrade");
       const focus = game.garage.lookAt || game.garage.tank || { x: game.garage.x, y: game.garage.y };
       game.garage.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, focusX: focus.x, focusY: focus.y };
       canvas.setPointerCapture(event.pointerId);
@@ -2164,16 +2336,25 @@
       };
     }
 
-    function garageTankConfig(account, slot, x, y, id = "garage-tank", slotIndex = account.activeTankSlot) {
+    function playerTankConfig(account, slot, x, y, options = {}) {
+      const {
+        id = "player-tank",
+        slotIndex = account.activeTankSlot,
+        playerIndex = 0,
+        team = "players",
+        mode = game.mode,
+        color = null,
+        goldenBulletEquipped = false
+      } = options;
       const tankClass = buildTankClass(slot.tankBay);
       const upgrades = slot.upgrades || account.upgrades || {};
       const armorLevel = upgrades.armor || 0;
       const maxHp = HULL_DAMAGE * 3 + armorLevel * HULL_DAMAGE + tankClass.hpBonus;
       const radius = tankClass.style === "heavy" ? 30 : tankClass.style === "hover" ? 24 : tankClass.style === "float" ? 27 : 25;
       return {
-        id, team: "players", controller: "human", playerIndex: 0, accountId: account.id,
+        id, team, controller: "human", playerIndex, accountId: account.id,
         tankSlotIndex: slotIndex, accuracyTraining: slot.accuracyTraining, name: account.name,
-        x, y, color: tankClass.color, bodyColor: tankClass.bodyColor, topColor: tankClass.topColor, trackColor: tankClass.trackColor,
+        x, y, color: color || playerTankColor(mode, playerIndex, tankClass), bodyColor: tankClass.bodyColor, topColor: tankClass.topColor, trackColor: tankClass.trackColor,
         hp: maxHp, maxHp, r: radius, speed: tankClass.speed + (upgrades.speed || 0) * 20,
         bulletSpeed: tankClass.bulletSpeed || (ORIGINAL_SHELL_SPEED + (upgrades.bulletSpeed || 0) * 55),
         bulletDamage: HULL_DAMAGE + (upgrades.damage || 0) * 8 + tankClass.damageBonus,
@@ -2185,8 +2366,16 @@
         rocketLevel: upgrades.rocket || 0, airstrikeLevel: upgrades.airstrike || 0, repairDroneLevel: upgrades.repairDrone || 0,
         mineDropper: !!upgrades.bombDropper,
         mineDestroyer: !tankClass.waterGlide && (!!upgrades.mineDestroyer || tankClass.utility === "mineDestroyer"),
-        barricadeUpgrade: !!upgrades.barricade, tankStyle: tankClass.style, bodyStyle: tankClass.bodyStyle, gunStyle: tankClass.gunStyle
+        barricadeUpgrade: !!upgrades.barricade,
+        goldenBulletEquipped,
+        goldenBulletArmed: false,
+        goldenBulletUsed: false,
+        tankStyle: tankClass.style, bodyStyle: tankClass.bodyStyle, gunStyle: tankClass.gunStyle
       };
+    }
+
+    function garageTankConfig(account, slot, x, y, id = "garage-tank", slotIndex = account.activeTankSlot) {
+      return playerTankConfig(account, slot, x, y, { id, slotIndex, playerIndex: 0, team: "players", mode: "garage" });
     }
 
     function syncGarageTank(account, slot) {
@@ -2233,18 +2422,7 @@
         game.garage.y = clamp(game.garage.y + move.y / length * 105 * dt, 64, layout.h - 64);
         if (Math.hypot(move.x, move.y) > .08) game.garage.angle = lerpAngle(game.garage.angle, Math.atan2(move.y, move.x), 8 * dt);
       } else {
-        tank.reload = Math.max(0, tank.reload - dt);
-        tank.rocketReload = Math.max(0, tank.rocketReload - dt);
-        tank.launcherReload = Math.max(0, tank.launcherReload - dt);
-        tank.mineReload = Math.max(0, tank.mineReload - dt);
-        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
-        tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
-        tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
-        updateHumanTank(tank, dt);
-        updateRocketPods(dt, [tank]);
-        updateLasers(dt, [tank]);
-        updateRepairDrone(tank, dt);
-        updateTankDamageEffects(tank, dt);
+        updateActiveTankCharacteristics([tank], dt, { hazards: false });
         game.garage.x = tank.x; game.garage.y = tank.y; game.garage.angle = tank.bodyAngle;
         if (Math.hypot(move.x, move.y) > .05) game.garage.lookAt = null;
       }
@@ -2254,8 +2432,8 @@
       const x = broken ? game.garage.x : tank.x;
       const y = broken ? game.garage.y : tank.y;
       if (y < 155 && Math.abs(x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 108 && !broken) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
-      if (x < 138 && y > layout.tankDoor.y - 16 && y < layout.tankDoor.y + layout.tankDoor.h + 16) return enterGarageRoom("tank");
-      if (x < 138 && y > layout.upgradeDoor.y - 16 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 16) return enterGarageRoom("upgrade");
+      if (x < 170 && y > layout.tankDoor.y - 12 && y < layout.tankDoor.y + layout.tankDoor.h + 12) return enterGarageRoom("tank");
+      if (x < 170 && y > layout.upgradeDoor.y - 12 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 12) return enterGarageRoom("upgrade");
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index];
         if (broken && account.activeTankSlot === index && Math.hypot(x - pad.x, y - pad.y) < 94) {
@@ -2277,15 +2455,7 @@
       return tank;
     }
 
-    function drawRoomDoor(x, y, w, h, label, open = false, side = "top") {
-      if (side === "left") {
-        ctx.save();
-        ctx.translate(x + w / 2, y + h / 2);
-        ctx.rotate(Math.PI / 2);
-        drawRoomDoor(-h / 2, -w / 2, h, w, label, open, "top");
-        ctx.restore();
-        return;
-      }
+    function drawRoomDoor(x, y, w, h, label, open = false) {
       const r = Math.min(w * .42, h * .31);
       const outerPath = (inset = 0) => {
         const left = x + inset, right = x + w - inset, top = y + inset, bottom = y + h;
@@ -2314,6 +2484,41 @@
       ctx.fillStyle = "#172f3b";
       roundRect(x + w / 2 - Math.min(w - 18, label.length * 11 + 28) / 2, y + 3, Math.min(w - 18, label.length * 11 + 28), 27, 4); ctx.fill();
       ctx.fillStyle = "#fff7df"; ctx.font = "900 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, x + w / 2, y + 22);
+      ctx.restore();
+    }
+
+    function drawSideWallDoor(door, open = false) {
+      const { x, y, w, h, label } = door;
+      const sideArchPath = (inset = 0) => {
+        const left = x + inset;
+        const top = y + inset;
+        const bottom = y + h - inset;
+        const right = x + w - inset;
+        const shoulder = right - Math.min(70, w * .34);
+        ctx.beginPath();
+        ctx.moveTo(left, top);
+        ctx.lineTo(shoulder, top);
+        ctx.quadraticCurveTo(right, top, right, y + h / 2);
+        ctx.quadraticCurveTo(right, bottom, shoulder, bottom);
+        ctx.lineTo(left, bottom);
+        ctx.closePath();
+      };
+      ctx.save();
+      sideArchPath();
+      ctx.fillStyle = "#294653"; ctx.fill();
+      ctx.strokeStyle = "#1b3440"; ctx.lineWidth = 14; ctx.lineJoin = "round"; ctx.stroke();
+      sideArchPath(11);
+      ctx.fillStyle = "#102532"; ctx.fill();
+      ctx.strokeStyle = "#a5c1c5"; ctx.lineWidth = 5; ctx.stroke();
+      sideArchPath(20);
+      ctx.fillStyle = open ? "#050d14" : "#08151e"; ctx.fill();
+      ctx.fillStyle = "rgba(105,225,239,.45)";
+      roundRect(x + w - 25, y + h * .28, 6, h * .44, 3); ctx.fill();
+      const plaqueW = Math.min(136, Math.max(92, label.length * 13 + 28));
+      ctx.fillStyle = "#172f3b";
+      roundRect(x + 24, y + 8, plaqueW, 34, 5); ctx.fill();
+      ctx.fillStyle = "#fff7df"; ctx.font = "900 19px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(label, x + 24 + plaqueW / 2, y + 25);
       ctx.restore();
     }
 
@@ -2409,9 +2614,9 @@
         ctx.strokeStyle = "#173b4d"; ctx.lineWidth = 4; ctx.stroke();
         ctx.restore();
       }
-      drawRoomDoor(layout.arenaDoor.x, layout.arenaDoor.y, layout.arenaDoor.w, layout.arenaDoor.h, layout.arenaDoor.label, false, layout.arenaDoor.side);
-      drawRoomDoor(layout.tankDoor.x, layout.tankDoor.y, layout.tankDoor.w, layout.tankDoor.h, layout.tankDoor.label, false, layout.tankDoor.side);
-      drawRoomDoor(layout.upgradeDoor.x, layout.upgradeDoor.y, layout.upgradeDoor.w, layout.upgradeDoor.h, layout.upgradeDoor.label, false, layout.upgradeDoor.side);
+      drawRoomDoor(layout.arenaDoor.x, layout.arenaDoor.y, layout.arenaDoor.w, layout.arenaDoor.h, layout.arenaDoor.label);
+      drawSideWallDoor(layout.tankDoor);
+      drawSideWallDoor(layout.upgradeDoor);
       drawTrackMarks();
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index], slot = account.tankSlots[index];
@@ -3892,60 +4097,15 @@
       const playerCount = game.activePlayers.length;
       for (let i = 0; i < playerCount; i++) {
         const account = game.activePlayers[i];
-        const tankClass = selectedTankClass(account);
-        const armorLevel = account.upgrades.armor || 0;
-        const damageLevel = account.upgrades.damage || 0;
-        const reloadLevel = account.upgrades.reload || 0;
-        const moveSpeedLevel = account.upgrades.speed || 0;
-        const bulletSpeedLevel = account.upgrades.bulletSpeed || 0;
-        const maxHp = HULL_DAMAGE * 3 + armorLevel * HULL_DAMAGE + tankClass.hpBonus;
-        const tankRadius = tankClass.style === "heavy" ? 30 : tankClass.style === "hover" ? 24 : tankClass.style === "float" ? 27 : 25;
-        const spawn = safePlayerSpawn(mode, i, tankRadius);
-        game.tanks.push(makeTank({
+        const slot = accountTankSlot(account);
+        const preview = playerTankConfig(account, slot, 0, 0, { id: "p" + i, playerIndex: i, mode });
+        const spawn = safePlayerSpawn(mode, i, preview.r);
+        game.tanks.push(makeTank(playerTankConfig(account, slot, spawn.x, spawn.y, {
           id: "p" + i,
-          team: "players",
-          controller: "human",
           playerIndex: i,
-          accountId: account.id,
-          tankSlotIndex: account.activeTankSlot,
-          accuracyTraining: accountTankSlot(account)?.accuracyTraining || 0,
-          repairDroneLevel: account.upgrades.repairDrone || 0,
-          name: account.name,
-          x: spawn.x,
-          y: spawn.y,
-          color: playerTankColor(mode, i, tankClass),
-          bodyColor: tankClass.bodyColor,
-          topColor: tankClass.topColor,
-          trackColor: tankClass.trackColor,
-          hp: maxHp,
-          maxHp,
-          r: tankRadius,
-          speed: tankClass.speed + moveSpeedLevel * 20,
-          bulletSpeed: tankClass.bulletSpeed || (ORIGINAL_SHELL_SPEED + bulletSpeedLevel * 55),
-          bulletDamage: HULL_DAMAGE + damageLevel * 8 + tankClass.damageBonus,
-          reloadTime: tankClass.reloadTime || Math.max(.34, .58 - reloadLevel * .055 - tankClass.reloadBonus),
-          shellCount: tankClass.shellCount || 1,
-          shellRadius: tankClass.shellRadius || 7,
-          laserGun: !!tankClass.laserGun,
-          cannonGun: !!tankClass.cannonGun,
-          rocketPod: !!tankClass.rocketPod,
-          trackingRockets: !!account.upgrades.trackingRockets,
-          waterGlide: !!tankClass.waterGlide,
-          floatDodge: !!tankClass.floatDodge,
-          laserLevel: account.upgrades.laser || 0,
-          armorLevel: armorLevel + (tankClass.armorLevel || 0),
-          rocketLevel: account.upgrades.rocket || 0,
-          airstrikeLevel: account.upgrades.airstrike || 0,
-          mineDropper: !!account.upgrades.bombDropper,
-          mineDestroyer: !tankClass.waterGlide && (!!account.upgrades.mineDestroyer || tankClass.utility === "mineDestroyer"),
-          barricadeUpgrade: !!account.upgrades.barricade,
-          goldenBulletEquipped: goldenLoadout.has(account.id),
-          goldenBulletArmed: false,
-          goldenBulletUsed: false,
-          tankStyle: tankClass.style,
-          bodyStyle: tankClass.bodyStyle,
-          gunStyle: tankClass.gunStyle
-        }));
+          mode,
+          goldenBulletEquipped: goldenLoadout.has(account.id)
+        })));
       }
       // The battle entrance belongs in the left edge wall, not as a floating object in the arena.
       game.entryDoor = game.tanks[0] ? { x: 76, y: clamp(game.tanks[0].y, 150, WORLD.h - 150), side: "left" } : null;
@@ -5306,6 +5466,27 @@
       return true;
     }
 
+    function updateActiveTankCharacteristics(tanks, dt, options = {}) {
+      const hazards = options.hazards !== false;
+      for (const tank of tanks) {
+        if (!tank.alive) continue;
+        tank.reload = Math.max(0, tank.reload - dt);
+        tank.rocketReload = Math.max(0, tank.rocketReload - dt);
+        tank.launcherReload = Math.max(0, tank.launcherReload - dt);
+        tank.mineReload = Math.max(0, tank.mineReload - dt);
+        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
+        tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
+        tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
+        if (tank.controller === "human") updateHumanTank(tank, dt);
+        else updateAiTank(tank, dt);
+        if (hazards) updateHazardDamage(tank, dt);
+        updateRepairDrone(tank, dt);
+        updateTankDamageEffects(tank, dt);
+      }
+      updateRocketPods(dt, tanks);
+      updateLasers(dt, tanks);
+    }
+
     function update(dt) {
       updateTankSlotClocks(dt);
       if (game.state === "garage") {
@@ -5336,28 +5517,12 @@
       if (isCaptureMode(game.mode)) updateCaptureRespawns(dt);
       updateSiege(dt);
       updateMovingMines(dt);
-      for (const tank of game.tanks) {
-        if (!tank.alive) continue;
-        tank.reload = Math.max(0, tank.reload - dt);
-        tank.rocketReload = Math.max(0, tank.rocketReload - dt);
-        tank.launcherReload = Math.max(0, tank.launcherReload - dt);
-        tank.mineReload = Math.max(0, tank.mineReload - dt);
-        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
-        tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
-        tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
-        if (tank.controller === "human") updateHumanTank(tank, dt);
-        else updateAiTank(tank, dt);
-        updateHazardDamage(tank, dt);
-        updateRepairDrone(tank, dt);
-        updateTankDamageEffects(tank, dt);
-      }
+      updateActiveTankCharacteristics(game.tanks, dt);
       updatePickups(dt);
       updateBarricades(dt);
       updateRevives(dt);
       updateAirstrikeAim(dt);
       updateAirstrikes(dt);
-      updateRocketPods(dt);
-      updateLasers(dt);
       updateBullets(dt);
       updateParticles(dt);
       updateTrackMarks(dt);
@@ -5401,25 +5566,9 @@
         if (room.brain) room.brain.experience += dt;
         room.noticeTimer = Math.max(0, room.noticeTimer - dt);
       }
-      for (const tank of game.tanks) {
-        if (!tank.alive) continue;
-        tank.reload = Math.max(0, tank.reload - dt);
-        tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
-        tank.rocketReload = Math.max(0, tank.rocketReload - dt);
-        tank.launcherReload = Math.max(0, tank.launcherReload - dt);
-        tank.mineReload = Math.max(0, tank.mineReload - dt);
-        tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
-        tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
-        if (tank.controller === "ai") updateAiTank(tank, dt);
-        if (tank.controller === "human") updateHumanTank(tank, dt);
-        updateHazardDamage(tank, dt);
-        updateRepairDrone(tank, dt);
-        updateTankDamageEffects(tank, dt);
-      }
+      updateActiveTankCharacteristics(game.tanks, dt);
       updateAirstrikeAim(dt);
       updateAirstrikes(dt);
-      updateRocketPods(dt);
-      updateLasers(dt);
       updateBullets(dt);
       updateParticles(dt);
       updateTrackMarks(dt);
@@ -7891,17 +8040,10 @@
     function updateRoundExit(dt) {
       const exit = game.roundExit;
       exit.time += dt;
+      const driveableTanks = game.tanks.filter((tank) => tank.alive && tank.controller === "human");
+      updateActiveTankCharacteristics(driveableTanks, dt, { hazards: false });
       for (const tank of game.tanks) {
-        if (tank.alive) {
-          tank.reload = Math.max(0, tank.reload - dt);
-          tank.rocketReload = Math.max(0, tank.rocketReload - dt);
-          tank.launcherReload = Math.max(0, tank.launcherReload - dt);
-          tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
-          tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
-          updateHumanTank(tank, dt);
-          updateRepairDrone(tank, dt);
-          updateTankDamageEffects(tank, dt);
-        } else {
+        if (!tank.alive && tank.controller === "human") {
           const keyboard = keyboardControl(tank.playerIndex).move;
           const pad = input[tank.playerIndex];
           const move = Math.hypot(keyboard.x, keyboard.y) > .05 ? keyboard : pad.move;
@@ -7923,8 +8065,6 @@
           return;
         }
       }
-      updateRocketPods(dt);
-      updateLasers(dt);
       updateBullets(dt);
       updateParticles(dt);
       updateTrackMarks(dt);
@@ -8182,7 +8322,11 @@
 
     function drawBattleDoor() {
       const door = game.entryDoor;
-      drawRoomDoor(door.x - 66, door.y - 78, 132, 158, game.roundExit ? "GARAGE" : "ENTRY", !!game.roundExit, door.side || "top");
+      if (door.side === "left") {
+        drawSideWallDoor({ x: -20, y: door.y - 120, w: 205, h: 240, label: game.roundExit ? "GARAGE" : "ENTRY" }, !!game.roundExit);
+        return;
+      }
+      drawRoomDoor(door.x - 88, door.y - 95, 176, 190, game.roundExit ? "GARAGE" : "ENTRY", !!game.roundExit);
     }
 
     function drawBrokenExitTank(x, y, angle) {
@@ -11189,4 +11333,3 @@
   </script>
 </body>
 </html>
-
