@@ -4653,6 +4653,11 @@
         electricSplitTime: 0,
         electricSplitTotal: 30,
         electricSplitVictims: new Set(),
+        electricCapturedId: null,
+        capturedById: null,
+        capturedOriginalTeam: null,
+        capturedOriginalController: null,
+        capturedOriginalPlayerIndex: null,
         laserLevel: config.laserLevel || 0,
         laserTargetId: null,
         laserTime: 0,
@@ -4885,7 +4890,7 @@
           burst(barrage.x, barrage.y, "#ff9f1c", 32, 340);
           burst(barrage.x, barrage.y, "#4b5563", 18, 210);
           for (const tank of livingPlayers) {
-            if (tank.alive && Math.hypot(tank.x - barrage.x, tank.y - barrage.y) < barrage.r + tank.r) {
+            if (tank.alive && circleTouchesTank(barrage.x, barrage.y, barrage.r, tank)) {
               damageTank(tank, tank.maxHp * .5, "artillery");
             }
           }
@@ -5637,6 +5642,11 @@
         tank.barricadeCooldown = Math.max(0, tank.barricadeCooldown - dt);
         tank.laserCooldown = Math.max(0, tank.laserCooldown - dt);
         tank.laserBlockedTime = Math.max(0, tank.laserBlockedTime - dt);
+        if (tank.capturedById) {
+          updateCapturedElectricTank(tank, tanks);
+          updateTankDamageEffects(tank, dt);
+          continue;
+        }
         if (tank.controller === "human") updateHumanTank(tank, dt);
         else updateAiTank(tank, dt);
         if (hazards) updateHazardDamage(tank, dt);
@@ -5651,6 +5661,15 @@
     function updateElectricSplit(tank, dt, tanks = game.tanks) {
       if (!tank.electricTracks || tank.electricSplitTime <= 0) return;
       tank.electricSplitTime = Math.max(0, tank.electricSplitTime - dt);
+      const captured = tank.electricCapturedId
+        ? tanks.find((other) => other.id === tank.electricCapturedId && other.alive)
+        : null;
+      if (captured) {
+        syncCapturedElectricTank(tank, captured);
+        if (tank.electricSplitTime <= 0) releaseElectricCapture(tank, true, tanks);
+        return;
+      }
+      if (tank.electricCapturedId) tank.electricCapturedId = null;
       const forwardX = Math.cos(tank.bodyAngle);
       const forwardY = Math.sin(tank.bodyAngle);
       const sideX = -forwardY;
@@ -5666,12 +5685,85 @@
         burst(other.x, other.y, "#bffbff", 34, 330);
         burst(other.x, other.y, "#2ec4b6", 22, 240);
         playTone(92, .22, "sawtooth", .12);
-        damageTank(other, 9999, "electricSplit");
+        if (Math.random() < .5) damageTank(other, 9999, "electricSplit");
+        else captureElectricTank(tank, other);
+        break;
       }
       if (tank.electricSplitTime <= 0) {
         tank.electricSplitVictims.clear();
         burst(tank.x, tank.y, "#69e7ff", 12, 150);
       }
+    }
+
+    function captureElectricTank(owner, captured) {
+      if (!owner?.alive || !captured?.alive || owner.electricCapturedId) return false;
+      owner.electricCapturedId = captured.id;
+      captured.capturedById = owner.id;
+      captured.capturedOriginalTeam = captured.team;
+      captured.capturedOriginalController = captured.controller;
+      captured.capturedOriginalPlayerIndex = captured.playerIndex;
+      captured.team = owner.team;
+      captured.controller = "captured";
+      captured.playerIndex = owner.playerIndex;
+      captured.aiMove = { x: 0, y: 0 };
+      syncCapturedElectricTank(owner, captured);
+      burst(owner.x, owner.y, "#69e7ff", 30, 260);
+      playTone(180, .18, "square", .1);
+      playTone(310, .24, "triangle", .1, .08);
+      updateElectricSplitButtons();
+      return true;
+    }
+
+    function syncCapturedElectricTank(owner, captured) {
+      captured.x = owner.x;
+      captured.y = owner.y;
+      captured.bodyAngle = owner.bodyAngle;
+      captured.turretAngle = owner.turretAngle;
+      captured.vx = owner.vx;
+      captured.vy = owner.vy;
+      captured.trackOffset = owner.trackOffset;
+    }
+
+    function updateCapturedElectricTank(captured, tanks = game.tanks) {
+      const owner = tanks.find((tank) => tank.id === captured.capturedById && tank.alive);
+      if (!owner || owner.electricCapturedId !== captured.id || owner.electricSplitTime <= 0) {
+        restoreCapturedElectricTank(captured, true);
+        return;
+      }
+      syncCapturedElectricTank(owner, captured);
+    }
+
+    function restoreCapturedElectricTank(captured, moveAway = false) {
+      if (!captured) return;
+      const owner = game.tanks.find((tank) => tank.id === captured.capturedById);
+      if (moveAway && owner && captured.alive) {
+        captured.x += Math.cos(owner.bodyAngle + Math.PI / 2) * 92;
+        captured.y += Math.sin(owner.bodyAngle + Math.PI / 2) * 92;
+      }
+      if (captured.capturedOriginalTeam !== null) captured.team = captured.capturedOriginalTeam;
+      if (captured.capturedOriginalController !== null) captured.controller = captured.capturedOriginalController;
+      if (captured.capturedOriginalPlayerIndex !== null) captured.playerIndex = captured.capturedOriginalPlayerIndex;
+      captured.capturedById = null;
+      captured.capturedOriginalTeam = null;
+      captured.capturedOriginalController = null;
+      captured.capturedOriginalPlayerIndex = null;
+    }
+
+    function releaseElectricCapture(owner, destroyCaptured = false, tanks = game.tanks) {
+      const captured = owner?.electricCapturedId
+        ? tanks.find((tank) => tank.id === owner.electricCapturedId)
+        : null;
+      if (owner) {
+        owner.electricCapturedId = null;
+        owner.electricSplitTime = 0;
+        owner.electricSplitVictims.clear();
+      }
+      if (captured) {
+        restoreCapturedElectricTank(captured, !destroyCaptured);
+        if (destroyCaptured && captured.alive) damageTank(captured, 9999, "electricCrush");
+      }
+      if (owner) burst(owner.x, owner.y, "#69e7ff", 18, 190);
+      updateElectricSplitButtons();
     }
 
     function update(dt) {
@@ -5843,8 +5935,25 @@
         const laserHeld = pad.firing || keyboard.fire || autoLaser;
         updateLaserCharge(tank, laserHeld, dt);
         if (laserHeld) fireUpgradeRocket(tank);
+        updateCapturedElectricWeapon(tank, laserHeld, dt);
       } else if (autoFire || (!tank.garageWorld && manualAim) || pad.firing || keyboard.fire) {
         fire(tank);
+        updateCapturedElectricWeapon(tank, true, dt);
+      } else {
+        updateCapturedElectricWeapon(tank, false, dt);
+      }
+    }
+
+    function updateCapturedElectricWeapon(owner, held, dt) {
+      if (!owner.electricCapturedId) return;
+      const captured = game.tanks.find((tank) => tank.id === owner.electricCapturedId && tank.alive);
+      if (!captured) return;
+      syncCapturedElectricTank(owner, captured);
+      if (captured.laserGun) {
+        updateLaserCharge(captured, held, dt);
+        if (held) fireUpgradeRocket(captured);
+      } else if (held) {
+        fire(captured);
       }
     }
 
@@ -6374,7 +6483,7 @@
     }
 
     function collidesTank(tank) {
-      const hitbox = tankHitbox(tank);
+      const hitboxes = tankCollisionHitboxes(tank);
       for (const wall of game.obstacles) {
         if (wall.decorative || wall.kind === "stopper" || wall.kind === "wire" || wall.kind === "cliffRamp") continue;
         if (wall.kind === "barricade") {
@@ -6382,7 +6491,7 @@
           continue;
         }
         const bounds = obstacleBounds(wall);
-        if (rectsOverlap(hitbox, bounds)) return true;
+        if (hitboxes.some((hitbox) => rectsOverlap(hitbox, bounds))) return true;
       }
       if (game.mode === "blueRoom" && game.blueRoom?.phase === "countdown") {
         const subject = game.tanks.find((other) => other.aiRole === "blueRoomSubject" && other.alive && other.forceField);
@@ -6390,14 +6499,16 @@
       }
       for (const other of game.tanks) {
         if (other === tank || !other.alive) continue;
+        if (tank.capturedById === other.id || other.capturedById === tank.id) continue;
         if (electricGapAllowsOverlap(tank, other) || electricGapAllowsOverlap(other, tank)) continue;
-        if (rectsOverlap(hitbox, tankHitbox(other))) return true;
+        const otherHitboxes = tankCollisionHitboxes(other);
+        if (hitboxes.some((hitbox) => otherHitboxes.some((otherHitbox) => rectsOverlap(hitbox, otherHitbox)))) return true;
       }
       return false;
     }
 
     function electricGapAllowsOverlap(splitter, other) {
-      if (!splitter.electricTracks || splitter.electricSplitTime <= 0 || sameTeam(splitter.team, other.team)) return false;
+      if (!splitter.electricTracks || splitter.electricSplitTime <= 0 || splitter.electricCapturedId || sameTeam(splitter.team, other.team)) return false;
       const dx = other.x - splitter.x;
       const dy = other.y - splitter.y;
       const forwardDistance = dx * Math.cos(splitter.bodyAngle) + dy * Math.sin(splitter.bodyAngle);
@@ -6448,6 +6559,67 @@
     function tankHitbox(tank) {
       const size = Math.max(34, tank.r * 1.55);
       return { x: tank.x - size / 2, y: tank.y - size / 2, w: size, h: size };
+    }
+
+    function electricSplitActive(tank) {
+      return !!tank?.electricTracks && tank.electricSplitTime > 0;
+    }
+
+    function electricTrackLocalHitboxes(tank, padding = 0) {
+      const scale = tank.visualScale || 1;
+      const halfLength = 32 * scale + padding;
+      const halfWidth = 11 * scale + padding;
+      const separation = 54 * scale;
+      return [-1, 1].map((side) => ({
+        x: -halfLength,
+        y: side * separation - halfWidth,
+        w: halfLength * 2,
+        h: halfWidth * 2
+      }));
+    }
+
+    function localRectWorldBounds(tank, rect) {
+      const cos = Math.cos(tank.bodyAngle || 0);
+      const sin = Math.sin(tank.bodyAngle || 0);
+      const corners = [
+        [rect.x, rect.y], [rect.x + rect.w, rect.y],
+        [rect.x, rect.y + rect.h], [rect.x + rect.w, rect.y + rect.h]
+      ].map(([x, y]) => ({ x: tank.x + x * cos - y * sin, y: tank.y + x * sin + y * cos }));
+      const xs = corners.map((point) => point.x);
+      const ys = corners.map((point) => point.y);
+      return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    }
+
+    function tankCollisionHitboxes(tank) {
+      if (!electricSplitActive(tank)) return [tankHitbox(tank)];
+      return electricTrackLocalHitboxes(tank).map((rect) => localRectWorldBounds(tank, rect));
+    }
+
+    function worldPointInTankLocalRect(tank, x, y, rect) {
+      const angle = tank.bodyAngle || 0;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const dx = x - tank.x;
+      const dy = y - tank.y;
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      return pointInRect(localX, localY, rect);
+    }
+
+    function circleTouchesTank(x, y, radius, tank) {
+      if (!electricSplitActive(tank)) return Math.hypot(tank.x - x, tank.y - y) < tank.r + radius;
+      const angle = tank.bodyAngle || 0;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const dx = x - tank.x;
+      const dy = y - tank.y;
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      return electricTrackLocalHitboxes(tank).some((rect) => {
+        const nearestX = clamp(localX, rect.x, rect.x + rect.w);
+        const nearestY = clamp(localY, rect.y, rect.y + rect.h);
+        return Math.hypot(localX - nearestX, localY - nearestY) < radius;
+      });
     }
 
     function spawnStartingHealthPickups() {
@@ -6628,6 +6800,18 @@
       return tank?.projectileStore || game.bullets;
     }
 
+    function electricTrackWeaponMuzzles(tank, forwardDistance, angle = tank.turretAngle) {
+      const forwardX = Math.cos(angle);
+      const forwardY = Math.sin(angle);
+      const sideX = -Math.sin(tank.bodyAngle || 0);
+      const sideY = Math.cos(tank.bodyAngle || 0);
+      const separation = 54 * (tank.visualScale || 1);
+      return [-1, 1].map((side) => ({
+        x: tank.x + forwardX * forwardDistance + sideX * separation * side,
+        y: tank.y + forwardY * forwardDistance + sideY * separation * side
+      }));
+    }
+
     function fire(tank) {
       if (!tank.alive) return;
       if (tank.rocketPod) {
@@ -6661,31 +6845,36 @@
       const count = goldenShot ? 1 : tank.shellCount || 1;
       const raisedId = currentRaisedTerrainId(tank.x, tank.y);
       const bossShell = tank.aiRole === "boss10" || tank.aiRole === "boss20" || tank.aiRole === "boss30";
-      for (let i = 0; i < count; i++) {
-        const offset = count === 1 ? 0 : (i === 0 ? -7 : 7);
-        const sideX = Math.cos(shotAngle + Math.PI / 2) * offset;
-        const sideY = Math.sin(shotAngle + Math.PI / 2) * offset;
-        projectileStoreFor(tank).push({
-          x: tank.x + ax * 34 + sideX,
-          y: tank.y + ay * 34 + sideY,
-          vx: ax * tank.bulletSpeed,
-          vy: ay * tank.bulletSpeed,
-          r: tank.shellRadius || 7,
-          type: "shell",
-          angle: shotAngle,
-          life: bossShell ? 7 : 4.8,
-          team: tank.team,
-          owner: tank.id,
-          highShot: !!raisedId,
-          skippedWallId: raisedId,
-          color: goldenShot ? "#ffd166" : tank.shellColor,
-          golden: goldenShot,
-          cannon: !!tank.cannonGun,
-          bossRicochets: tank.aiRole === "boss30" ? 1 : 0,
-          damage: goldenShot ? 9999 : tank.cannonGun ? 9999 : count === 1 ? tank.bulletDamage : tank.bulletDamage * .55
-        });
+      const muzzles = electricSplitActive(tank)
+        ? electricTrackWeaponMuzzles(tank, 34, shotAngle)
+        : [{ x: tank.x + ax * 34, y: tank.y + ay * 34 }];
+      for (const muzzle of muzzles) {
+        for (let i = 0; i < count; i++) {
+          const offset = count === 1 ? 0 : (i === 0 ? -7 : 7);
+          const sideX = Math.cos(shotAngle + Math.PI / 2) * offset;
+          const sideY = Math.sin(shotAngle + Math.PI / 2) * offset;
+          projectileStoreFor(tank).push({
+            x: muzzle.x + sideX,
+            y: muzzle.y + sideY,
+            vx: ax * tank.bulletSpeed,
+            vy: ay * tank.bulletSpeed,
+            r: tank.shellRadius || 7,
+            type: "shell",
+            angle: shotAngle,
+            life: bossShell ? 7 : 4.8,
+            team: tank.team,
+            owner: tank.id,
+            highShot: !!raisedId,
+            skippedWallId: raisedId,
+            color: goldenShot ? "#ffd166" : tank.shellColor,
+            golden: goldenShot,
+            cannon: !!tank.cannonGun,
+            bossRicochets: tank.aiRole === "boss30" ? 1 : 0,
+            damage: goldenShot ? 9999 : tank.cannonGun ? 9999 : count === 1 ? tank.bulletDamage : tank.bulletDamage * .55
+          });
+        }
+        burst(muzzle.x + ax * 4, muzzle.y + ay * 4, goldenShot ? "#ffd166" : "#fff7df", goldenShot ? 14 : 5, goldenShot ? 220 : 120);
       }
-      burst(tank.x + ax * 38, tank.y + ay * 38, goldenShot ? "#ffd166" : "#fff7df", goldenShot ? 14 : 5, goldenShot ? 220 : 120);
       if (!goldenShot) playCannonFireSound();
       if (!goldenShot) fireUpgradeRocket(tank);
     }
@@ -6731,7 +6920,10 @@
       tank.laserTime = tank.laserChargeTime;
       tank.laserCharge = 0;
       tank.laserBlockedTime = 0;
-      burst(muzzle.x, muzzle.y, "#69e7ff", 12, 180);
+      const muzzles = electricSplitActive(tank)
+        ? electricTrackWeaponMuzzles(tank, 59, tank.turretAngle)
+        : [muzzle];
+      for (const point of muzzles) burst(point.x, point.y, "#69e7ff", 8, 180);
     }
 
     function laserMuzzle(tank) {
@@ -6779,23 +6971,28 @@
       tank.rocketReload = tank.rocketReloadTime;
       const sideX = Math.cos(tank.turretAngle + Math.PI / 2) * 13;
       const sideY = Math.sin(tank.turretAngle + Math.PI / 2) * 13;
-      projectileStoreFor(tank).push({
-        x: tank.x + ax * 39 + sideX,
-        y: tank.y + ay * 39 + sideY,
-        vx: ax * (tank.rocketSpeed || 430),
-        vy: ay * (tank.rocketSpeed || 430),
-        r: 10,
-        type: "rocket",
-        angle: tank.turretAngle,
-        life: 2.35,
-        team: tank.team,
-        owner: tank.id,
-        highShot: !!currentRaisedTerrainId(tank.x, tank.y),
-        skippedWallId: currentRaisedTerrainId(tank.x, tank.y),
-        proximityRadius: tank.rocketProximity || 10,
-        damage: tank.rocketDamage || 95
-      });
-      burst(tank.x + ax * 42 + sideX, tank.y + ay * 42 + sideY, "#ff9f1c", 9, 160);
+      const muzzles = electricSplitActive(tank)
+        ? electricTrackWeaponMuzzles(tank, 39, tank.turretAngle)
+        : [{ x: tank.x + ax * 39 + sideX, y: tank.y + ay * 39 + sideY }];
+      for (const muzzle of muzzles) {
+        projectileStoreFor(tank).push({
+          x: muzzle.x,
+          y: muzzle.y,
+          vx: ax * (tank.rocketSpeed || 430),
+          vy: ay * (tank.rocketSpeed || 430),
+          r: 10,
+          type: "rocket",
+          angle: tank.turretAngle,
+          life: 2.35,
+          team: tank.team,
+          owner: tank.id,
+          highShot: !!currentRaisedTerrainId(tank.x, tank.y),
+          skippedWallId: currentRaisedTerrainId(tank.x, tank.y),
+          proximityRadius: tank.rocketProximity || 10,
+          damage: tank.rocketDamage || 95
+        });
+        burst(muzzle.x + ax * 3, muzzle.y + ay * 3, "#ff9f1c", 9, 160);
+      }
     }
 
     function startRocketPod(tank, targetMode = "near") {
@@ -6842,9 +7039,11 @@
       const angle = baseAngle + (target && tank.launcherTargets.length >= 6 ? 0 : spread);
       const ax = Math.cos(angle);
       const ay = Math.sin(angle);
+      const trackMuzzles = electricSplitActive(tank) ? electricTrackWeaponMuzzles(tank, 42, angle) : null;
+      const muzzle = trackMuzzles ? trackMuzzles[index % trackMuzzles.length] : { x: tank.x + ax * 42, y: tank.y + ay * 42 };
       projectileStoreFor(tank).push({
-        x: tank.x + ax * 42,
-        y: tank.y + ay * 42,
+        x: muzzle.x,
+        y: muzzle.y,
         vx: ax * 470,
         vy: ay * 470,
         r: 11,
@@ -6868,7 +7067,7 @@
         proximityRadius: 18,
         damage: 64
       });
-      burst(tank.x + ax * 46, tank.y + ay * 46, "#8d41c7", 10, 185);
+      burst(muzzle.x + ax * 4, muzzle.y + ay * 4, "#8d41c7", 10, 185);
     }
 
     function updateRocketPods(dt, tanks = game.tanks) {
@@ -7019,7 +7218,7 @@
           if (!tank.alive || tank.buried || (tank.forceField && game.blueRoom?.phase === "countdown") || tank.id === bullet.owner || sameTeam(tank.team, bullet.team)) continue;
           if (bullet.floatPassedTankIds?.includes(tank.id)) continue;
           const hitRadius = bullet.type === "rocket" ? Math.max(bullet.r, bullet.proximityRadius || bullet.r) : bullet.r;
-          if (Math.hypot(tank.x - bullet.x, tank.y - bullet.y) < tank.r + hitRadius) {
+          if (circleTouchesTank(bullet.x, bullet.y, hitRadius, tank)) {
             if (bullet.type === "rocket") {
               if (floatDodgeHit(tank, "rocket")) {
                 bullet.floatPassedTankIds = [...(bullet.floatPassedTankIds || []), tank.id];
@@ -7156,26 +7355,31 @@
           continue;
         }
         tank.laserTargetId = null;
-        const muzzle = laserMuzzle(tank);
         const direction = { x: Math.cos(tank.turretAngle), y: Math.sin(tank.turretAngle) };
-        const first = traceLaserSegment(tank, muzzle.x, muzzle.y, direction, true);
-        tank.laserSegments = [first.segment];
-        tank.laserAimX = first.segment.x2;
-        tank.laserAimY = first.segment.y2;
+        const muzzles = electricSplitActive(tank)
+          ? electricTrackWeaponMuzzles(tank, 59, tank.turretAngle)
+          : [laserMuzzle(tank)];
+        tank.laserSegments = [];
         tank.laserBlockedTime = 0;
-        if (first.blocker?.reflector) {
-          const dot = direction.x * first.blocker.nx + direction.y * first.blocker.ny;
-          const reflected = { x: direction.x - 2 * dot * first.blocker.nx, y: direction.y - 2 * dot * first.blocker.ny };
-          const reflectedLength = Math.hypot(reflected.x, reflected.y) || 1;
-          reflected.x /= reflectedLength;
-          reflected.y /= reflectedLength;
-          const startX = first.segment.x2 + reflected.x * 2;
-          const startY = first.segment.y2 + reflected.y * 2;
-          const second = traceLaserSegment(tank, startX, startY, reflected, false);
-          tank.laserSegments.push(second.segment);
-          if (second.blocker?.tank) damageLaserTarget(tank, second.blocker.tank, dt);
-        } else if (first.blocker?.tank) {
-          damageLaserTarget(tank, first.blocker.tank, dt);
+        for (const muzzle of muzzles) {
+          const first = traceLaserSegment(tank, muzzle.x, muzzle.y, direction, true);
+          tank.laserSegments.push(first.segment);
+          tank.laserAimX = first.segment.x2;
+          tank.laserAimY = first.segment.y2;
+          if (first.blocker?.reflector) {
+            const dot = direction.x * first.blocker.nx + direction.y * first.blocker.ny;
+            const reflected = { x: direction.x - 2 * dot * first.blocker.nx, y: direction.y - 2 * dot * first.blocker.ny };
+            const reflectedLength = Math.hypot(reflected.x, reflected.y) || 1;
+            reflected.x /= reflectedLength;
+            reflected.y /= reflectedLength;
+            const startX = first.segment.x2 + reflected.x * 2;
+            const startY = first.segment.y2 + reflected.y * 2;
+            const second = traceLaserSegment(tank, startX, startY, reflected, false);
+            tank.laserSegments.push(second.segment);
+            if (second.blocker?.tank) damageLaserTarget(tank, second.blocker.tank, dt);
+          } else if (first.blocker?.tank) {
+            damageLaserTarget(tank, first.blocker.tank, dt);
+          }
         }
       }
     }
@@ -7307,9 +7511,15 @@
       const wheels = tank.tankStyle === "wheels";
       const halfW = (wheels ? 46 : heavy ? 37 : 30) * scale;
       const halfH = (wheels ? 38 : heavy ? 31 : 27) * scale;
-      const bounds = { x: -halfW, y: -halfH, w: halfW * 2, h: halfH * 2 };
-      if (pointInRect(start.x, start.y, bounds)) return { t: 0, x: sx, y: sy };
-      const hit = segmentRectHitPoint(start.x, start.y, end.x, end.y, bounds);
+      const boundsList = electricSplitActive(tank)
+        ? electricTrackLocalHitboxes(tank)
+        : [{ x: -halfW, y: -halfH, w: halfW * 2, h: halfH * 2 }];
+      let hit = null;
+      for (const bounds of boundsList) {
+        if (pointInRect(start.x, start.y, bounds)) return { t: 0, x: sx, y: sy };
+        const candidate = segmentRectHitPoint(start.x, start.y, end.x, end.y, bounds);
+        if (candidate && (!hit || candidate.t < hit.t)) hit = candidate;
+      }
       if (!hit) return null;
       return {
         t: hit.t,
@@ -7337,7 +7547,7 @@
         if (!tank.alive || tank.id === rocket.owner || sameTeam(tank.team, rocket.team)) continue;
         if (rocket.floatPassedTankIds?.includes(tank.id)) continue;
         const distance = Math.hypot(tank.x - rocket.x, tank.y - rocket.y);
-        if (distance <= radius + tank.r) {
+        if (circleTouchesTank(rocket.x, rocket.y, radius, tank)) {
           const falloff = clamp(1 - distance / (radius + tank.r), .25, 1);
           damageTank(tank, rocket.damage * falloff, "rocket");
           burst(tank.x, tank.y, tank.color, 10, 190);
@@ -7375,7 +7585,7 @@
       for (const tank of game.tanks) {
         if (!tank.alive || tank.id === strike.owner || sameTeam(tank.team, strike.team)) continue;
         const distance = Math.hypot(tank.x - strike.x, tank.y - strike.y);
-        if (distance <= radius + tank.r) {
+        if (circleTouchesTank(strike.x, strike.y, radius, tank)) {
           damageTank(tank, tank.aiRole === "boss20" ? Math.ceil(tank.maxHp / 2) : 999, "artillery");
           burst(tank.x, tank.y, tank.color, 18, 260);
         }
@@ -7415,6 +7625,16 @@
       if (amount > 0) tank.tookDamage = true;
       tank.hp -= amount;
       if (tank.hp <= 0) {
+        if (tank.electricCapturedId) releaseElectricCapture(tank, false);
+        if (tank.capturedById) {
+          const owner = game.tanks.find((candidate) => candidate.id === tank.capturedById);
+          if (owner) {
+            owner.electricCapturedId = null;
+            owner.electricSplitTime = 0;
+            owner.electricSplitVictims.clear();
+          }
+          restoreCapturedElectricTank(tank, false);
+        }
         tank.alive = false;
         tank.hp = 0;
         if (tank.controller === "human" && usesTankSlotRecovery(game.mode)) {
@@ -7467,7 +7687,7 @@
           continue;
         }
         if (hazard.team && sameTeam(hazard.team, tank.team)) continue;
-        if (Math.hypot(tank.x - hazard.x, tank.y - hazard.y) < hazard.r + tank.r * .45) {
+        if (circleTouchesTank(hazard.x, hazard.y, hazard.r + tank.r * .2, tank)) {
           if (hazard.kind === "mine") {
             if (tank.waterGlide) continue;
             if (tank.mineDestroyer && mineIsInFront(tank, hazard)) {
@@ -7504,7 +7724,7 @@
           const bounds = obstacleBounds(cactus);
           const cx = clamp(tank.x, bounds.x, bounds.x + bounds.w);
           const cy = clamp(tank.y, bounds.y, bounds.y + bounds.h);
-          if (Math.hypot(tank.x - cx, tank.y - cy) < tank.r + 8) damageTank(tank, 10 * dt, "hazard");
+          if (circleTouchesTank(cx, cy, 8, tank)) damageTank(tank, 10 * dt, "hazard");
         }
       }
       game.hazards = game.hazards.filter((hazard) => !hazard.used);
@@ -9966,6 +10186,7 @@
       const separation = tank.electricSplitTime > 0 ? 54 : 27;
       drawTread(-30, -separation - 7, tank.trackOffset, tank.trackColor);
       drawTread(-30, separation - 7, tank.trackOffset, tank.trackColor);
+      if (tank.electricCapturedId) return;
       ctx.save();
       ctx.strokeStyle = "#d7fdff";
       ctx.lineWidth = tank.electricSplitTime > 0 ? 5 : 3;
@@ -11183,7 +11404,13 @@
 
     function activateElectricSplit(index) {
       const tank = controllableTankForPlayer(index);
-      if (!tank || !tank.alive || !tank.electricTracks || tank.electricSplitTime > 0) return;
+      if (!tank || !tank.alive || !tank.electricTracks) return;
+      if (tank.electricCapturedId) {
+        releaseElectricCapture(tank, true);
+        playTone(76, .25, "sawtooth", .13);
+        return;
+      }
+      if (tank.electricSplitTime > 0) return;
       tank.electricSplitTime = tank.electricSplitTotal || 30;
       tank.electricSplitVictims.clear();
       burst(tank.x, tank.y, "#69e7ff", 24, 240);
@@ -11200,7 +11427,8 @@
         const available = !!tank && tank.alive && tank.electricTracks;
         button.classList.toggle("hidden", !available);
         button.classList.toggle("active", available && tank.electricSplitTime > 0);
-        button.textContent = available && tank.electricSplitTime > 0 ? `${Math.ceil(tank.electricSplitTime)}s` : "Split";
+        if (available && tank.electricCapturedId) button.textContent = "Crush";
+        else button.textContent = available && tank.electricSplitTime > 0 ? `${Math.ceil(tank.electricSplitTime)}s` : "Split";
       });
     }
 
