@@ -1859,6 +1859,7 @@
     const mainMenu = document.getElementById("mainMenu");
     const promoMenu = document.getElementById("promoMenu");
     const tradeMenu = document.getElementById("tradeMenu");
+    const mysteryMenu = document.getElementById("mysteryMenu");
     const multiMenu = document.getElementById("multiMenu");
     const upgradeMenu = document.getElementById("upgradeMenu");
     const tankBayMenu = document.getElementById("tankBayMenu");
@@ -1883,6 +1884,7 @@
     const blueRoomButton = document.getElementById("blueRoomButton");
     const promoLetter = document.getElementById("promoLetter");
     const tradeLetter = document.getElementById("tradeLetter");
+    const mysteryLetter = document.getElementById("mysteryLetter");
     const promoCodeInput = document.getElementById("promoCodeInput");
     const promoRedeemButton = document.getElementById("promoRedeemButton");
     const promoResult = document.getElementById("promoResult");
@@ -1891,6 +1893,10 @@
     const tradeGoldenToSteel = document.getElementById("tradeGoldenToSteel");
     const tradeSteelToGolden = document.getElementById("tradeSteelToGolden");
     const tradeResult = document.getElementById("tradeResult");
+    const mysteryPanel = document.getElementById("mysteryPanel");
+    const mysteryBalance = document.getElementById("mysteryBalance");
+    const mysteryBuyButton = document.getElementById("mysteryBuyButton");
+    const mysteryResult = document.getElementById("mysteryResult");
     const menuButton = document.getElementById("menuButton");
     const goldenPrompt = document.getElementById("goldenPrompt");
     const goldenPromptText = document.getElementById("goldenPromptText");
@@ -2074,12 +2080,13 @@
       const returningFromArenaMenu = screen === "garage" && mainMenu.classList.contains("active");
       if (returningFromTankRoom) placeGarageTankAtDoor("tank");
       else if (returningFromUpgradeRoom) placeGarageTankAtDoor("upgrade");
-      else if (returningFromArenaMenu && game.garage.returnDoor === "arena") placeGarageTankAtDoor("arena");
+      else if (returningFromArenaMenu && game.garage.returnDoor) placeGarageTankAtDoor(game.garage.returnDoor);
       garageUi.classList.toggle("active", screen === "garage");
       settingsMenu.classList.toggle("active", screen === "settings");
       mainMenu.classList.toggle("active", screen === "main");
       promoMenu.classList.toggle("active", screen === "promo");
       tradeMenu.classList.toggle("active", screen === "trade");
+      mysteryMenu.classList.toggle("active", screen === "mystery");
       multiMenu.classList.toggle("active", screen === "multi");
       upgradeMenu.classList.toggle("active", screen === "upgrades");
       tankBayMenu.classList.toggle("active", screen === "tankBay");
@@ -2108,9 +2115,11 @@
       }
       if (screen === "promo") renderPromoMenu();
       if (screen === "trade") renderTradeMenu();
+      if (screen === "mystery") renderMysteryMenu();
       if (screen === "multi") renderMultiplayerMenu();
       if (screen === "upgrades") renderUpgradeMenu();
       if (screen === "tankBay") renderTankBay();
+      updateElectricSplitButtons();
     }
 
     function showMainMenu() {
@@ -2137,13 +2146,30 @@
     }
 
     function garageLayout() {
+      const topDoorSpecs = [
+        { kind: "all", label: "ALL" },
+        { kind: "arena", label: "ARENA" },
+        ...(siegeUnlocked() ? [{ kind: "siege", label: "SIEGE" }] : []),
+        ...(blueRoomUnlocked() ? [{ kind: "blueRoom", label: "BLUE ROOM" }] : [])
+      ];
+      const doorW = 184;
+      const gap = 24;
+      const startX = 1700 - (topDoorSpecs.length * doorW + (topDoorSpecs.length - 1) * gap) / 2;
+      const topDoors = topDoorSpecs.map((door, index) => ({
+        ...door,
+        x: startX + index * (doorW + gap), y: -18, w: doorW, h: 96, side: "top"
+      }));
       return {
         w: 3400,
         h: 920,
         pads: [{ x: 640, y: 500 }, { x: 1700, y: 500 }, { x: 2760, y: 500 }],
-        arenaDoor: { x: 1625, y: -24, w: 150, h: 164, label: "ARENA", side: "top" },
-        tankDoor: { x: -20, y: 182, w: 205, h: 248, label: "TANK", side: "left" },
-        upgradeDoor: { x: -20, y: 510, w: 205, h: 248, label: "UPGRADE", side: "left" }
+        topDoors,
+        allDoor: topDoors.find((door) => door.kind === "all"),
+        arenaDoor: topDoors.find((door) => door.kind === "arena"),
+        siegeDoor: topDoors.find((door) => door.kind === "siege") || null,
+        blueRoomDoor: topDoors.find((door) => door.kind === "blueRoom") || null,
+        tankDoor: { x: -28, y: 195, w: 125, h: 210, label: "TANK", side: "left" },
+        upgradeDoor: { x: -28, y: 530, w: 125, h: 210, label: "UPGRADE", side: "left" }
       };
     }
 
@@ -2151,7 +2177,21 @@
       const layout = garageLayout();
       if (kind === "tank") return { x: layout.tankDoor.x + layout.tankDoor.w + 92, y: layout.tankDoor.y + layout.tankDoor.h / 2, angle: 0 };
       if (kind === "upgrade") return { x: layout.upgradeDoor.x + layout.upgradeDoor.w + 92, y: layout.upgradeDoor.y + layout.upgradeDoor.h / 2, angle: 0 };
-      return { x: layout.arenaDoor.x + layout.arenaDoor.w / 2, y: layout.arenaDoor.y + layout.arenaDoor.h + 62, angle: Math.PI / 2 };
+      const door = layout.topDoors.find((candidate) => candidate.kind === kind) || layout.arenaDoor;
+      return { x: door.x + door.w / 2, y: door.y + door.h + 62, angle: Math.PI / 2 };
+    }
+
+    function garageTopDoorAt(layout, x, y) {
+      if (y >= 88) return null;
+      return layout.topDoors.find((door) => x > door.x - 20 && x < door.x + door.w + 20) || null;
+    }
+
+    function enterGarageTopDoor(kind) {
+      game.garage.returnDoor = kind;
+      if (kind === "all") return showArenaMenu();
+      if (kind === "siege") return requestStartGame("siege");
+      if (kind === "blueRoom") return startBlueRoom();
+      return requestStartGame("single");
     }
 
     function placeGarageTankAtDoor(kind) {
@@ -2297,9 +2337,10 @@
       }
       const pad = layout.pads.findIndex((position) => Math.hypot(position.x - point.x, position.y - point.y) < 150);
       if (pad >= 0) return selectGaragePad(pad);
-      if (point.y < 150 && Math.abs(point.x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 115) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
-      if (point.x < 205 && point.y > layout.tankDoor.y - 18 && point.y < layout.tankDoor.y + layout.tankDoor.h + 18) return enterGarageRoom("tank");
-      if (point.x < 205 && point.y > layout.upgradeDoor.y - 18 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 18) return enterGarageRoom("upgrade");
+      const topDoor = garageTopDoorAt(layout, point.x, point.y);
+      if (topDoor) return enterGarageTopDoor(topDoor.kind);
+      if (point.x < 120 && point.y > layout.tankDoor.y - 18 && point.y < layout.tankDoor.y + layout.tankDoor.h + 18) return enterGarageRoom("tank");
+      if (point.x < 120 && point.y > layout.upgradeDoor.y - 18 && point.y < layout.upgradeDoor.y + layout.upgradeDoor.h + 18) return enterGarageRoom("upgrade");
       const focus = game.garage.lookAt || game.garage.tank || { x: game.garage.x, y: game.garage.y };
       game.garage.drag = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, focusX: focus.x, focusY: focus.y };
       canvas.setPointerCapture(event.pointerId);
@@ -2362,6 +2403,7 @@
         shellCount: tankClass.shellCount || 1, shellRadius: tankClass.shellRadius || 7,
         laserGun: !!tankClass.laserGun, cannonGun: !!tankClass.cannonGun, rocketPod: !!tankClass.rocketPod,
         trackingRockets: !!upgrades.trackingRockets, waterGlide: !!tankClass.waterGlide, floatDodge: !!tankClass.floatDodge,
+        electricTracks: !!tankClass.electricSplit,
         laserLevel: upgrades.laser || 0, armorLevel: armorLevel + (tankClass.armorLevel || 0),
         rocketLevel: upgrades.rocket || 0, airstrikeLevel: upgrades.airstrike || 0, repairDroneLevel: upgrades.repairDrone || 0,
         mineDropper: !!upgrades.bombDropper,
@@ -2407,6 +2449,7 @@
 
     function updateGarage(dt) {
       if (!garageUi.classList.contains("active")) return;
+      if (goldenPrompt.classList.contains("active")) return;
       const account = garageAccount();
       const layout = garageLayout();
       const slot = accountTankSlot(account);
@@ -2429,11 +2472,13 @@
       updateGarageBullets(dt, layout);
       updateParticles(dt);
       updateTrackMarks(dt);
+      updateElectricSplitButtons();
       const x = broken ? game.garage.x : tank.x;
       const y = broken ? game.garage.y : tank.y;
-      if (y < 155 && Math.abs(x - (layout.arenaDoor.x + layout.arenaDoor.w / 2)) < 108 && !broken) { game.garage.returnDoor = "arena"; return showArenaMenu(); }
-      if (x < 170 && y > layout.tankDoor.y - 12 && y < layout.tankDoor.y + layout.tankDoor.h + 12) return enterGarageRoom("tank");
-      if (x < 170 && y > layout.upgradeDoor.y - 12 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 12) return enterGarageRoom("upgrade");
+      const topDoor = garageTopDoorAt(layout, x, y);
+      if (topDoor && !broken) return enterGarageTopDoor(topDoor.kind);
+      if (x < 112 && y > layout.tankDoor.y - 12 && y < layout.tankDoor.y + layout.tankDoor.h + 12) return enterGarageRoom("tank");
+      if (x < 112 && y > layout.upgradeDoor.y - 12 && y < layout.upgradeDoor.y + layout.upgradeDoor.h + 12) return enterGarageRoom("upgrade");
       for (let index = 0; index < layout.pads.length; index++) {
         const pad = layout.pads[index];
         if (broken && account.activeTankSlot === index && Math.hypot(x - pad.x, y - pad.y) < 94) {
@@ -2484,6 +2529,28 @@
       ctx.fillStyle = "#172f3b";
       roundRect(x + w / 2 - Math.min(w - 18, label.length * 11 + 28) / 2, y + 3, Math.min(w - 18, label.length * 11 + 28), 27, 4); ctx.fill();
       ctx.fillStyle = "#fff7df"; ctx.font = "900 16px system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, x + w / 2, y + 22);
+      ctx.restore();
+    }
+
+    function drawTopWallDoor(door, open = false) {
+      const { x, y, w, h, label } = door;
+      ctx.save();
+      ctx.fillStyle = "#1b3440";
+      roundRect(x - 10, y, w + 20, h + 10, 4); ctx.fill();
+      ctx.fillStyle = "#4d6975";
+      roundRect(x - 2, y + 5, w + 4, h, 3); ctx.fill();
+      ctx.fillStyle = open ? "#03090d" : "#07131d";
+      roundRect(x + 13, 0, w - 26, h - 17, 3); ctx.fill();
+      ctx.fillStyle = "rgba(105,225,239,.5)";
+      roundRect(x + 23, h - 10, w - 46, 6, 3); ctx.fill();
+      const plaqueW = Math.min(w - 20, Math.max(84, label.length * 13 + 30));
+      ctx.fillStyle = "#172f3b";
+      roundRect(x + w / 2 - plaqueW / 2, 4, plaqueW, 32, 4); ctx.fill();
+      ctx.fillStyle = "#fff7df";
+      ctx.font = `900 ${label.length > 7 ? 14 : 18}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x + w / 2, 20);
       ctx.restore();
     }
 
@@ -2574,7 +2641,8 @@
     function drawGarageWalls(layout) {
       const spans = (start, length, holeStart, holeLength) => start < holeStart + holeLength && start + length > holeStart;
       for (let x = 0; x < layout.w; x += 96) {
-        if (!spans(x, 94, layout.arenaDoor.x - 8, layout.arenaDoor.w + 16)) drawGarageWallBlock(x, 0, 94, 60);
+        const topGap = layout.topDoors.some((door) => spans(x, 94, door.x - 8, door.w + 16));
+        if (!topGap) drawGarageWallBlock(x, 0, 94, 60);
         drawGarageWallBlock(x, layout.h - 60, 94, 60);
       }
       for (let y = 60; y < layout.h - 60; y += 88) {
@@ -2614,7 +2682,7 @@
         ctx.strokeStyle = "#173b4d"; ctx.lineWidth = 4; ctx.stroke();
         ctx.restore();
       }
-      drawRoomDoor(layout.arenaDoor.x, layout.arenaDoor.y, layout.arenaDoor.w, layout.arenaDoor.h, layout.arenaDoor.label);
+      for (const door of layout.topDoors) drawTopWallDoor(door);
       drawSideWallDoor(layout.tankDoor);
       drawSideWallDoor(layout.upgradeDoor);
       drawTrackMarks();
@@ -2660,9 +2728,9 @@
       saveProgress();
     }
 
-    function promoCodeRedeemed(account = promoAccount()) {
+    function promoCodeRedeemed(account = promoAccount(), code = "CLASH") {
       migrateLegacyPromoCode();
-      return !!account?.promoCodes?.clash;
+      return !!account?.promoCodes?.[code.toLowerCase()];
     }
 
     function openPromoMenu() {
@@ -2672,31 +2740,102 @@
 
     function renderPromoMenu() {
       const account = promoAccount();
-      const redeemed = promoCodeRedeemed(account);
+      const clashRedeemed = promoCodeRedeemed(account, "CLASH");
+      const looseRedeemed = promoCodeRedeemed(account, "LOOSE");
+      const allRedeemed = clashRedeemed && looseRedeemed;
       promoCodeInput.value = "";
-      promoCodeInput.disabled = redeemed;
-      promoRedeemButton.disabled = redeemed;
-      promoRedeemButton.textContent = redeemed ? "Already Redeemed" : "Redeem";
-      promoResult.textContent = redeemed ? "This promo code was already used." : "";
+      promoCodeInput.disabled = allRedeemed;
+      promoRedeemButton.disabled = allRedeemed;
+      promoRedeemButton.textContent = allRedeemed ? "All Codes Redeemed" : "Redeem";
+      promoResult.textContent = allRedeemed ? "Both promo codes were already used by this player." : "";
     }
 
     function redeemPromoCode() {
       const account = promoAccount();
-      if (promoCodeRedeemed(account)) return;
       const code = promoCodeInput.value.trim();
-      if (code !== "CLASH") {
+      const rewards = {
+        CLASH: { steelBucks: 1000, goldenBullets: 5 },
+        LOOSE: { steelBucks: 2002, goldenBullets: 10 }
+      };
+      const reward = rewards[code];
+      if (!reward) {
         promoResult.textContent = "That code does not work.";
         return;
       }
-      account.steelBucks += 1000;
-      account.goldenBullets = (account.goldenBullets || 0) + 5;
-      account.promoCodes = { ...(account.promoCodes || {}), clash: true };
+      if (promoCodeRedeemed(account, code)) {
+        promoResult.textContent = `${code} was already used by this player.`;
+        return;
+      }
+      account.steelBucks += reward.steelBucks;
+      account.goldenBullets = (account.goldenBullets || 0) + reward.goldenBullets;
+      account.promoCodes = { ...(account.promoCodes || {}), [code.toLowerCase()]: true };
       saveAccounts();
       saveProgress();
-      promoResult.textContent = "Code accepted: +1,000 Steel Bucks and +5 Golden Bullets!";
+      promoResult.textContent = `Code accepted: +${reward.steelBucks.toLocaleString()} Steel Bucks and +${reward.goldenBullets} Golden Bullets!`;
       promoCodeInput.disabled = true;
       promoRedeemButton.disabled = true;
       setTimeout(showMainMenu, 1100);
+    }
+
+    function mysteryAccount() {
+      return selectedAccounts()[0] || game.accounts[0];
+    }
+
+    function grantElectricTracks(account) {
+      account.mysteryTracksUnlocked = true;
+      for (const slot of account.tankSlots || []) {
+        slot.tankBay.owned.tracks.electric = true;
+      }
+    }
+
+    function equipElectricTracks(account = mysteryAccount()) {
+      grantElectricTracks(account);
+      const slot = accountTankSlot(account);
+      slot.tankBay.selectedTracks = "electric";
+      slot.tankBay.previewTracks = "electric";
+      account.tankBay = slot.tankBay;
+      account.upgrades = slot.upgrades;
+      game.garage.tank = null;
+      saveAccounts();
+      syncShopAccount();
+    }
+
+    function openMysteryMenu() {
+      showScreen("mystery");
+    }
+
+    function renderMysteryMenu() {
+      const account = mysteryAccount();
+      const owned = !!account.mysteryTracksUnlocked;
+      const equipped = accountTankSlot(account).tankBay.selectedTracks === "electric";
+      mysteryPanel.classList.toggle("opened", owned);
+      mysteryBalance.textContent = `${account.name}: ${account.steelBucks.toLocaleString()} Steel Bucks and ${account.goldenBullets || 0} Golden Bullets`;
+      mysteryResult.textContent = owned ? "Electric Split Tracks unlocked. Split for 30 seconds and trap an enemy in the lightning." : "What is inside?";
+      if (!owned) {
+        mysteryBuyButton.textContent = "Open: 1,200 Steel Bucks + 1 Golden Bullet";
+        mysteryBuyButton.disabled = account.steelBucks < 1200 || (account.goldenBullets || 0) < 1;
+      } else {
+        mysteryBuyButton.textContent = equipped ? "Electric Tracks Equipped" : "Equip Electric Tracks";
+        mysteryBuyButton.disabled = equipped;
+      }
+    }
+
+    function buyOrEquipMysteryTracks() {
+      const account = mysteryAccount();
+      if (!account.mysteryTracksUnlocked) {
+        if (account.steelBucks < 1200 || (account.goldenBullets || 0) < 1) return;
+        account.steelBucks -= 1200;
+        account.goldenBullets -= 1;
+        equipElectricTracks(account);
+        mysteryPanel.classList.add("opened");
+        mysteryResult.textContent = "Electric Split Tracks unlocked and equipped!";
+        playTone(294, .12, "triangle", .16);
+        playTone(440, .18, "triangle", .18, .13);
+        setTimeout(renderMysteryMenu, 720);
+        return;
+      }
+      equipElectricTracks(account);
+      renderMysteryMenu();
     }
 
     function tradeAccount() {
@@ -2766,6 +2905,14 @@
         openTradeMenu();
       }
     });
+    mysteryLetter.addEventListener("click", openMysteryMenu);
+    mysteryLetter.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openMysteryMenu();
+      }
+    });
+    mysteryBuyButton.addEventListener("click", buyOrEquipMysteryTracks);
     tradeAmount.addEventListener("input", renderTradeMenu);
     tradeGoldenToSteel.addEventListener("click", () => tradeCurrency("goldToSteel"));
     tradeSteelToGolden.addEventListener("click", () => tradeCurrency("steelToGolden"));
@@ -2792,7 +2939,7 @@
 
     function navigateBack() {
       input.forEach((playerInput) => playerInput.firing = false);
-      if (multiMenu.classList.contains("active") || promoMenu.classList.contains("active") || tradeMenu.classList.contains("active")) {
+      if (multiMenu.classList.contains("active") || promoMenu.classList.contains("active") || tradeMenu.classList.contains("active") || mysteryMenu.classList.contains("active")) {
         showArenaMenu();
         return;
       }
@@ -3058,6 +3205,7 @@
         steelBucks: 0,
         goldenBullets: 0,
         promoCodes: {},
+        mysteryTracksUnlocked: false,
         blueRoomAI: normalizeBlueRoomAI(),
         upgrades: defaultUpgrades(),
         tankBay: defaultTankBay(),
@@ -3100,6 +3248,9 @@
       });
       if (!normalizedSlots[activeTankSlot].tankOwned) activeTankSlot = 0;
       normalizedSlots[activeTankSlot].unlocked = true;
+      if (account?.mysteryTracksUnlocked) {
+        for (const slot of normalizedSlots) slot.tankBay.owned.tracks.electric = true;
+      }
       const activeSlot = normalizedSlots[activeTankSlot];
       return {
         ...defaults,
@@ -3109,6 +3260,7 @@
         steelBucks: Number(account?.steelBucks || 0),
         goldenBullets: Number(account?.goldenBullets || 0),
         promoCodes: { ...(account?.promoCodes || {}) },
+        mysteryTracksUnlocked: !!account?.mysteryTracksUnlocked,
         blueRoomAI: normalizeBlueRoomAI(account?.blueRoomAI),
         upgrades: activeSlot.upgrades,
         tankBay: activeSlot.tankBay,
@@ -3397,7 +3549,8 @@
         wheels: { name: "Big Tires", cost: 75, style: "wheels", speed: 85, hpBonus: -20 },
         heavy: { name: "Heavy Tracks", cost: 90, style: "heavy", speed: 48, hpBonus: 35 },
         hover: { name: "Hovercraft", cost: 160, style: "hover", speed: 105, hpBonus: -38, waterGlide: true },
-        float: { name: "Float Pad", cost: 1000, style: "float", speed: 100, hpBonus: 10, waterGlide: true, floatDodge: true }
+        float: { name: "Float Pad", cost: 1000, style: "float", speed: 100, hpBonus: 10, waterGlide: true, floatDodge: true },
+        electric: { name: "Electric Split Tracks", cost: 0, style: "electric", speed: ORIGINAL_TANK_SPEED, hpBonus: 0, electricSplit: true }
       },
       guns: {
         standard: { name: "Standard Gun", cost: 0, damageBonus: 0, reloadBonus: 0, shellCount: 1, shellRadius: 7 },
@@ -3444,6 +3597,7 @@
         rocketPod: !!gun.rocketPod,
         waterGlide: !!tracks.waterGlide,
         floatDodge: !!tracks.floatDodge,
+        electricSplit: !!tracks.electricSplit,
         armorLevel: armor.armorLevel,
         gunStyle: tankBay.selectedGun === "double" ? "double" : tankBay.selectedGun === "heavy" ? "heavy" : tankBay.selectedGun === "laser" ? "laser" : tankBay.selectedGun === "cannon" ? "cannon" : tankBay.selectedGun === "himars" ? "himars" : "standard",
         utility: tankBay.selectedUtility || "none"
@@ -3568,6 +3722,7 @@
       account.steelBucks = balance - cost;
       slot.unlocked = true;
       slot.tankOwned = true;
+      if (account.mysteryTracksUnlocked) slot.tankBay.owned.tracks.electric = true;
       saveAccounts();
       syncShopAccount();
       renderTankBay();
@@ -3716,7 +3871,7 @@
     const bayPartOrder = {
       gun: ["standard", "heavy", "double", "laser", "cannon", "himars"],
       armor: ["standard", "extra"],
-      tracks: ["heavy", "standard", "wheels", "hover", "float"],
+      tracks: ["heavy", "standard", "wheels", "hover", "float", "electric"],
       utility: ["none", "mineDropper", "mineDestroyer"]
     };
 
@@ -3738,7 +3893,8 @@
         heavy: "Slower, tougher heavy tracks.",
         wheels: "Fast tires, less health.",
         hover: "Fast hover bubble. Skims over water, low health.",
-        float: "Fast white float pad. Skims over water, adds a little health, and every fourth shell, rocket, or artillery hit passes underneath."
+        float: "Fast white float pad. Skims over water, adds a little health, and every fourth shell, rocket, or artillery hit passes underneath.",
+        electric: "Disconnected electric tracks. Split apart for 30 seconds and destroy an enemy caught between them."
       },
       utility: {
         none: "No rear attachment.",
@@ -4493,6 +4649,10 @@
         waterGlide: !!config.waterGlide,
         floatDodge: !!config.floatDodge,
         floatHitCount: 0,
+        electricTracks: !!config.electricTracks,
+        electricSplitTime: 0,
+        electricSplitTotal: 30,
+        electricSplitVictims: new Set(),
         laserLevel: config.laserLevel || 0,
         laserTargetId: null,
         laserTime: 0,
@@ -5480,11 +5640,38 @@
         if (tank.controller === "human") updateHumanTank(tank, dt);
         else updateAiTank(tank, dt);
         if (hazards) updateHazardDamage(tank, dt);
+        updateElectricSplit(tank, dt, tanks);
         updateRepairDrone(tank, dt);
         updateTankDamageEffects(tank, dt);
       }
       updateRocketPods(dt, tanks);
       updateLasers(dt, tanks);
+    }
+
+    function updateElectricSplit(tank, dt, tanks = game.tanks) {
+      if (!tank.electricTracks || tank.electricSplitTime <= 0) return;
+      tank.electricSplitTime = Math.max(0, tank.electricSplitTime - dt);
+      const forwardX = Math.cos(tank.bodyAngle);
+      const forwardY = Math.sin(tank.bodyAngle);
+      const sideX = -forwardY;
+      const sideY = forwardX;
+      for (const other of tanks) {
+        if (!other.alive || other === tank || sameTeam(other.team, tank.team) || tank.electricSplitVictims.has(other.id)) continue;
+        const dx = other.x - tank.x;
+        const dy = other.y - tank.y;
+        const forwardDistance = dx * forwardX + dy * forwardY;
+        const sideDistance = dx * sideX + dy * sideY;
+        if (Math.abs(forwardDistance) > other.r + 17 || Math.abs(sideDistance) > 31) continue;
+        tank.electricSplitVictims.add(other.id);
+        burst(other.x, other.y, "#bffbff", 34, 330);
+        burst(other.x, other.y, "#2ec4b6", 22, 240);
+        playTone(92, .22, "sawtooth", .12);
+        damageTank(other, 9999, "electricSplit");
+      }
+      if (tank.electricSplitTime <= 0) {
+        tank.electricSplitVictims.clear();
+        burst(tank.x, tank.y, "#69e7ff", 12, 150);
+      }
     }
 
     function update(dt) {
@@ -5530,6 +5717,7 @@
       updateRocketLauncherButtons();
       updateLaserChargeButtons();
       updateBarricadeButtons();
+      updateElectricSplitButtons();
       if (isCaptureMode(game.mode)) updateCapturePoint(dt);
       game.shake = Math.max(0, game.shake - dt * 15);
       checkWinState();
@@ -5576,6 +5764,7 @@
       updateAirstrikeButtons();
       updateRocketLauncherButtons();
       updateLaserChargeButtons();
+      updateElectricSplitButtons();
       game.shake = Math.max(0, game.shake - dt * 15);
       checkWinState();
     }
@@ -6201,9 +6390,19 @@
       }
       for (const other of game.tanks) {
         if (other === tank || !other.alive) continue;
+        if (electricGapAllowsOverlap(tank, other) || electricGapAllowsOverlap(other, tank)) continue;
         if (rectsOverlap(hitbox, tankHitbox(other))) return true;
       }
       return false;
+    }
+
+    function electricGapAllowsOverlap(splitter, other) {
+      if (!splitter.electricTracks || splitter.electricSplitTime <= 0 || sameTeam(splitter.team, other.team)) return false;
+      const dx = other.x - splitter.x;
+      const dy = other.y - splitter.y;
+      const forwardDistance = dx * Math.cos(splitter.bodyAngle) + dy * Math.sin(splitter.bodyAngle);
+      const sideDistance = dx * -Math.sin(splitter.bodyAngle) + dy * Math.cos(splitter.bodyAngle);
+      return Math.abs(forwardDistance) <= other.r + 34 && Math.abs(sideDistance) <= 35;
     }
 
     function barricadeCenter(wall) {
@@ -9763,6 +9962,48 @@
       ctx.restore();
     }
 
+    function drawElectricTracks(tank) {
+      const separation = tank.electricSplitTime > 0 ? 54 : 27;
+      drawTread(-30, -separation - 7, tank.trackOffset, tank.trackColor);
+      drawTread(-30, separation - 7, tank.trackOffset, tank.trackColor);
+      ctx.save();
+      ctx.strokeStyle = "#d7fdff";
+      ctx.lineWidth = tank.electricSplitTime > 0 ? 5 : 3;
+      ctx.shadowColor = "#69e7ff";
+      ctx.shadowBlur = 13;
+      const flicker = Math.sin(performance.now() * .04 + tank.x) * 4;
+      ctx.beginPath();
+      ctx.moveTo(-14, -separation + 10);
+      ctx.lineTo(8 + flicker, -separation * .48);
+      ctx.lineTo(-7 - flicker, 0);
+      ctx.lineTo(11 + flicker, separation * .48);
+      ctx.lineTo(-12, separation - 10);
+      ctx.stroke();
+      ctx.strokeStyle = "#2ec4b6";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(15, -separation + 9);
+      ctx.lineTo(-4 - flicker, -separation * .34);
+      ctx.lineTo(12 + flicker, separation * .28);
+      ctx.lineTo(14, separation - 9);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawElectricSplitHull(tank) {
+      const separation = 54;
+      for (const side of [-1, 1]) {
+        ctx.fillStyle = tank.bodyColor;
+        roundRect(-24, side * separation - 18, 48, 36, 7);
+        ctx.fill();
+        ctx.fillStyle = shade(tank.bodyColor, -.22);
+        ctx.fillRect(-24, side * separation - 18, 8, 36);
+        ctx.fillRect(16, side * separation - 18, 8, 36);
+        ctx.fillStyle = "rgba(255,255,255,.22)";
+        ctx.fillRect(-10, side * separation - 13, 20, 6);
+      }
+    }
+
     function drawTank(tank) {
       if (tank.aiRole === "siegeArtillery") {
         drawSiegeArtillery(tank);
@@ -9807,12 +10048,16 @@
         drawHoverBubble(-36, -27, 72, 54, tank.trackColor);
       } else if (tank.tankStyle === "float") {
         drawFloatPad(tank.trackColor);
+      } else if (tank.tankStyle === "electric") {
+        drawElectricTracks(tank);
       } else {
         drawTread(tank.tankStyle === "heavy" ? -37 : -30, tank.tankStyle === "heavy" ? -31 : -27, tank.trackOffset, tank.trackColor);
         drawTread(tank.tankStyle === "heavy" ? -37 : -30, tank.tankStyle === "heavy" ? 19 : 15, tank.trackOffset, tank.trackColor);
       }
       if (tank.tankStyle === "float") {
         drawFloatHull(tank.bodyColor);
+      } else if (tank.tankStyle === "electric" && tank.electricSplitTime > 0) {
+        drawElectricSplitHull(tank);
       } else {
         ctx.fillStyle = tank.bodyColor;
         roundRect(bodyStyle === "heavy" ? -30 : -24, bodyStyle === "heavy" ? -23 : -20, bodyStyle === "heavy" ? 60 : 48, bodyStyle === "heavy" ? 46 : 40, 7);
@@ -10161,6 +10406,18 @@
         previewHoverBubble(pctx, -36, -27, 72, 54, tankClass.trackColor);
       } else if (tankClass.style === "float") {
         previewFloatPad(pctx, tankClass.trackColor);
+      } else if (tankClass.style === "electric") {
+        previewTread(pctx, -30, -34, tankClass.trackColor);
+        previewTread(pctx, -30, 22, tankClass.trackColor);
+        pctx.save();
+        pctx.strokeStyle = "#c9fbff";
+        pctx.lineWidth = 4;
+        pctx.shadowColor = "#69e7ff";
+        pctx.shadowBlur = 8;
+        pctx.beginPath();
+        pctx.moveTo(-10, -20); pctx.lineTo(8, -9); pctx.lineTo(-6, 2); pctx.lineTo(9, 13); pctx.lineTo(-8, 22);
+        pctx.stroke();
+        pctx.restore();
       } else {
         previewTread(pctx, tankClass.style === "heavy" ? -37 : -30, tankClass.style === "heavy" ? -31 : -27, tankClass.trackColor);
         previewTread(pctx, tankClass.style === "heavy" ? -37 : -30, tankClass.style === "heavy" ? 19 : 15, tankClass.trackColor);
@@ -10312,6 +10569,17 @@
           drawBaySideHover(pctx, trackY, tankClass.trackColor);
         } else if (tankClass.style === "float") {
           drawBaySideFloat(pctx, trackY, tankClass.trackColor);
+        } else if (tankClass.style === "electric") {
+          drawBaySideTracks(pctx, trackY, false, tankClass.trackColor);
+          pctx.save();
+          pctx.strokeStyle = "#c9fbff";
+          pctx.lineWidth = 7;
+          pctx.shadowColor = "#69e7ff";
+          pctx.shadowBlur = 14;
+          pctx.beginPath();
+          pctx.moveTo(-115, trackY + 4); pctx.lineTo(-70, trackY - 18); pctx.lineTo(-20, trackY + 3); pctx.lineTo(30, trackY - 20); pctx.lineTo(82, trackY + 2); pctx.lineTo(118, trackY - 15);
+          pctx.stroke();
+          pctx.restore();
         } else {
           drawBaySideTracks(pctx, trackY, tankClass.style === "heavy", tankClass.trackColor);
         }
@@ -10908,6 +11176,34 @@
       return game.tanks.find((tank) => tank.controller === "human" && tank.playerIndex === index);
     }
 
+    function controllableTankForPlayer(index) {
+      if (game.state === "garage" && index === 0) return game.garage.tank;
+      return tankForPlayerIndex(index);
+    }
+
+    function activateElectricSplit(index) {
+      const tank = controllableTankForPlayer(index);
+      if (!tank || !tank.alive || !tank.electricTracks || tank.electricSplitTime > 0) return;
+      tank.electricSplitTime = tank.electricSplitTotal || 30;
+      tank.electricSplitVictims.clear();
+      burst(tank.x, tank.y, "#69e7ff", 24, 240);
+      playTone(130, .2, "sawtooth", .11);
+      playTone(260, .16, "triangle", .12, .12);
+      updateElectricSplitButtons();
+    }
+
+    function updateElectricSplitButtons() {
+      document.querySelectorAll(".controlZone").forEach((zone) => {
+        const index = Number(zone.dataset.player);
+        const button = zone.querySelector(".phaseButton");
+        const tank = controllableTankForPlayer(index);
+        const available = !!tank && tank.alive && tank.electricTracks;
+        button.classList.toggle("hidden", !available);
+        button.classList.toggle("active", available && tank.electricSplitTime > 0);
+        button.textContent = available && tank.electricSplitTime > 0 ? `${Math.ceil(tank.electricSplitTime)}s` : "Split";
+      });
+    }
+
     function toggleAirstrike(index) {
       if (game.state !== "playing" || game.mapSpinTimer > 0) return;
       const tank = tankForPlayerIndex(index);
@@ -11230,6 +11526,8 @@
       goldenButton.addEventListener("click", () => toggleGoldenBullet(index));
       const barricadeButton = zone.querySelector(".barricadeButton");
       barricadeButton.addEventListener("click", () => deployBarricade(index));
+      const phaseButton = zone.querySelector(".phaseButton");
+      phaseButton.addEventListener("click", () => activateElectricSplit(index));
       const fireButton = zone.querySelector(".fire");
       let firePointerId = null;
       fireButton.addEventListener("pointerdown", (e) => {
